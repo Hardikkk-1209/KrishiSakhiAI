@@ -1,321 +1,484 @@
 import streamlit as st
 import requests
 import json
-from typing import Dict, List, Generator
-import time
+from typing import Dict, List
 import numpy as np
 import faiss
 import pickle
 from pathlib import Path
+import base64
+import time
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="KrishiSakhiAI Chat",
+    page_title="KrishiSakhiAI - Smart Farming Assistant",
     page_icon="🌾",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- START: Enhanced Custom CSS ---
+# --- START: Premium Modern CSS with Animations ---
 st.markdown("""
 <style>
-    /* Import Google Fonts for a modern, clean look */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-    
-    /* Global styling */
-    * {
-        font-family: 'Poppins', sans-serif;
-    }
-    
-    /* Main theme colors - Dark agricultural theme */
-    .stApp {
-        background: linear-gradient(135deg, #0e161c 0%, #172a3a 50%, #203e57 100%);
-        color: #e3f2fd;
-    }
-    
-    /* Header styling with a dynamic background */
-    .main-header {
-        background: linear-gradient(135deg, #065f46, #059669, #10b981);
-        padding: 3rem 1rem;
-        border-radius: 20px;
-        margin-bottom: 2rem;
-        box-shadow: 0 15px 35px rgba(16, 185, 129, 0.4);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        animation: gradient-anim 5s ease infinite;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    @keyframes gradient-anim {
-        0% {background-position: 0% 50%;}
-        50% {background-position: 100% 50%;}
-        100% {background-position: 0% 50%;}
-    }
-    
+:root {
+    --primary-green: #059669;
+    --primary-green-dark: #047857;
+    --secondary-green: #10b981;
+    --accent-blue: #3b82f6;
+    --dark-bg: #0f172a;
+    --darker-bg: #020617;
+    --card-bg: rgba(30, 41, 59, 0.8);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --border-subtle: rgba(148, 163, 184, 0.1);
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+}
+
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    transition: all 0.3s ease;
+}
+
+.stApp {
+    background: linear-gradient(135deg, var(--darker-bg) 0%, var(--dark-bg) 50%, #1e293b 100%);
+    color: var(--text-primary);
+}
+
+/* Animated Background Particles */
+.stApp::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(34, 197, 94, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Main Header with Glass Morphism */
+.main-header {
+    background: linear-gradient(135deg, 
+        rgba(5, 150, 105, 0.9) 0%, 
+        rgba(16, 185, 129, 0.8) 50%, 
+        rgba(34, 197, 94, 0.7) 100%
+    );
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 3rem 2rem;
+    border-radius: 24px;
+    margin-bottom: 2rem;
+    box-shadow: 
+        0 20px 40px rgba(16, 185, 129, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.main-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+.main-header h1 {
+    text-align: center;
+    font-size: 4rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #fff, #e0f2fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.main-header p {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.3rem;
+    font-weight: 400;
+    margin-top: 1rem;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.subtitle {
+    text-align: center;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-weight: 300;
+}
+
+/* Enhanced Chat Messages */
+.stChatMessage {
+    background: var(--card-bg) !important;
+    border-radius: 20px !important;
+    padding: 1.5rem !important;
+    margin: 1.5rem 0 !important;
+    border: 1px solid var(--border-subtle) !important;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.stChatMessage::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--secondary-green), var(--accent-blue));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stChatMessage:hover::before {
+    opacity: 1;
+}
+
+.stChatMessage[data-testid*="user"] {
+    border-left: 4px solid var(--secondary-green);
+    background: linear-gradient(135deg, 
+        rgba(16, 185, 129, 0.1) 0%, 
+        var(--card-bg) 100%
+    ) !important;
+}
+
+.stChatMessage[data-testid*="assistant"] {
+    border-left: 4px solid var(--accent-blue);
+    background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.1) 0%, 
+        var(--card-bg) 100%
+    ) !important;
+}
+
+/* Modern Buttons */
+.stButton > button {
+    background: linear-gradient(135deg, var(--primary-green), var(--secondary-green)) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 0.75rem 2rem !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+    transform: translateY(0);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stButton > button:hover {
+    background: linear-gradient(135deg, var(--primary-green-dark), var(--primary-green)) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4);
+}
+
+.stButton > button:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+}
+
+/* Enhanced Chat Input - Green Theme */
+.stChatInput > div > div {
+    background: var(--card-bg) !important;
+    border: 2px solid var(--secondary-green) !important;
+    border-radius: 20px !important;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.stChatInput > div > div:focus-within {
+    border-color: var(--primary-green) !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+/* Sidebar Enhancements */
+.css-1d391kg {
+    background: linear-gradient(180deg, var(--darker-bg) 0%, var(--dark-bg) 100%);
+    border-right: 1px solid var(--border-subtle);
+}
+
+.sidebar-content {
+    padding: 1rem;
+}
+
+/* Status Indicators */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.status-success {
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-info {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-blue);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.status-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Enhanced Selectbox and Sliders */
+.stSelectbox > div > div {
+    background: var(--card-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    color: var(--text-primary);
+}
+
+.stSlider > div > div > div > div {
+    background: var(--secondary-green);
+}
+
+/* File Uploader */
+.stFileUploader > div {
+    background: var(--card-bg);
+    border: 2px dashed var(--border-subtle);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stFileUploader > div:hover {
+    border-color: var(--secondary-green);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+/* Expandable Sections */
+.streamlit-expanderHeader {
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+}
+
+/* Metrics and Stats - Improved Single Line Design */
+.metric-card {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), var(--card-bg));
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.3s ease;
+    min-height: 60px;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2);
+    border-color: var(--secondary-green);
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--secondary-green);
+    margin: 0;
+    line-height: 1;
+}
+
+.metric-label {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin: 0;
+    line-height: 1;
+}
+
+/* Loading Animation */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.loading-text {
+    animation: pulse 2s infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--darker-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--secondary-green);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-green);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
     .main-header h1 {
-        color: #ffffff;
-        text-align: center;
-        margin: 0;
-        font-size: 3.5rem;
-        font-weight: 700;
-        text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-        letter-spacing: 2px;
+        font-size: 2.5rem;
     }
     
     .main-header p {
-        color: #d1fae5;
-        text-align: center;
-        margin: 1rem 0 0 0;
-        font-size: 1.3rem;
-        font-weight: 400;
+        font-size: 1.1rem;
     }
     
-    /* Sidebar styling */
-    .css-1d391kg {
-        background: linear-gradient(180deg, #064e3b 0%, #065f46 100%);
-    }
-    
-    .sidebar-title {
-        color: #ffffff;
-        font-size: 1.5rem;
-        font-weight: 600;
-        text-align: center;
-        padding: 1.5rem 0;
-        border-bottom: 2px solid rgba(255,255,255,0.1);
-        margin-bottom: 1.5rem;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
-    }
-    
-    /* Streamlit sidebar text color fix */
-    .css-1d391kg .stMarkdown, .css-1d391kg label {
-        color: #ffffff !important;
-    }
-    
-    /* Status indicators */
-    .status-box {
-        padding: 0.8rem 1.2rem;
-        border-radius: 12px;
-        text-align: center;
-        margin: 0.8rem 0;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        animation: status-pulse 1.5s infinite;
-    }
-    
-    @keyframes status-pulse {
-        0% {box-shadow: 0 4px 12px rgba(0,0,0,0.2);}
-        50% {box-shadow: 0 4px 18px rgba(0,0,0,0.4);}
-        100% {box-shadow: 0 4px 12px rgba(0,0,0,0.2);}
-    }
-    
-    .status-success {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-    }
-    
-    .status-error {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        color: white;
-    }
-    
-    .status-warning {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: white;
-    }
-    
-    /* Chat message styling - Much improved */
     .stChatMessage {
-        background: rgba(30, 41, 59, 0.6) !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(148, 163, 184, 0.1);
-        border-radius: 16px !important;
-        padding: 1.5rem !important;
         margin: 1rem 0 !important;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2) !important;
+        padding: 1rem !important;
     }
-    
-    /* User message styling */
-    .stChatMessage[data-testid*="user"] {
-        background: linear-gradient(135deg, rgba(34, 139, 34, 0.15), rgba(46, 139, 87, 0.15)) !important;
-        border-left: 5px solid #10b981;
-    }
-    
-    /* Assistant message styling */
-    .stChatMessage[data-testid*="assistant"] {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(51, 65, 85, 0.6)) !important;
-        border-left: 5px solid #3b82f6;
-    }
-    
-    /* Message text color and typography */
-    .stChatMessage .stMarkdown {
-        color: #e3f2fd !important;
-    }
-    
-    .stChatMessage .stMarkdown p {
-        color: #e3f2fd !important;
-        line-height: 1.8;
-        margin-bottom: 0.8rem;
-    }
-    
-    .stChatMessage .stMarkdown h1, .stChatMessage .stMarkdown h2, .stChatMessage .stMarkdown h3 {
-        color: #10b981 !important;
-        margin-top: 1.5rem;
-        margin-bottom: 0.7rem;
-        font-weight: 600;
-    }
-    
-    .stChatMessage .stMarkdown strong {
-        color: #81c784 !important;
-        font-weight: 600;
-    }
-    
-    .stChatMessage .stMarkdown code {
-        background: rgba(100, 116, 139, 0.2) !important;
-        color: #fbbf24 !important;
-        padding: 0.2rem 0.4rem;
-        border-radius: 4px;
-        font-family: 'Fira Code', 'Monaco', monospace;
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #059669, #10b981) !important;
-        color: white !important;
-        border-radius: 12px !important;
-        border: none !important;
-        padding: 0.8rem 2rem !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
-    }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #047857, #059669) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
-    }
-    
-    /* Instructions card */
-    .instructions-card {
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px solid rgba(148, 163, 184, 0.1);
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-        border-left: 4px solid #10b981;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        color: #e3f2fd;
-    }
-    
-    /* Source citations */
-    .source-citation {
-        background: rgba(59, 130, 246, 0.1);
-        border-left: 4px solid #3b82f6;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.8rem 0;
-        font-size: 0.9rem;
-        color: #e3f2fd;
-        backdrop-filter: blur(5px);
-    }
-    
-    /* Welcome content styling */
-    .welcome-content {
-        background: rgba(30, 41, 59, 0.8);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(148, 163, 184, 0.1);
-        border-radius: 20px;
-        padding: 2.5rem;
-        margin: 2rem 0;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        color: #e3f2fd;
-        text-align: center;
-    }
-    
-    .welcome-content h3 {
-        color: #10b981 !important;
-        text-align: center;
-        margin-bottom: 1.5rem;
-        font-weight: 700;
-        font-size: 2rem;
-    }
-    
-    .welcome-content p {
-        color: #e3f2fd !important;
-        line-height: 1.7;
-        margin-bottom: 1.2rem;
-        font-size: 1.1rem;
-    }
-    
-    .welcome-content ul {
-        list-style-type: none;
-        padding: 0;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 1rem;
-    }
-    
-    .welcome-content li {
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid #10b981;
-        border-radius: 8px;
-        padding: 0.7rem 1.2rem;
-        color: #e3f2fd;
-        font-weight: 500;
-        transition: transform 0.2s ease;
-    }
-    
-    .welcome-content li:hover {
-        transform: scale(1.05);
-    }
-    
-    /* Chat input styling */
-    .stChatInput > div > div {
-        background: rgba(30, 41, 59, 0.8) !important;
-        border: 1px solid rgba(148, 163, 184, 0.2) !important;
-        border-radius: 16px !important;
-        backdrop-filter: blur(10px);
-    }
-    
-    .stChatInput input {
-        background: transparent !important;
-        color: #e3f2fd !important;
-        border: none !important;
-        font-size: 1.1rem;
-    }
-    
-    .stChatInput input::placeholder {
-        color: #94a3b8 !important;
-    }
-    
-    /* Footer styling */
-    .footer {
-        background: linear-gradient(135deg, #064e3b, #065f46);
-        color: #d1fae5;
-        text-align: center;
-        padding: 1.5rem;
-        border-radius: 16px;
-        margin-top: 3rem;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    }
-    
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        background: rgba(30, 41, 59, 0.6) !important;
-        border: 1px solid rgba(148, 163, 184, 0.1) !important;
-        border-radius: 12px !important;
-        color: #e3f2fd !important;
-    }
+}
+
+/* Hover Effects for Interactive Elements */
+.stCheckbox:hover,
+.stSelectbox:hover,
+.stSlider:hover {
+    transform: translateY(-1px);
+}
+
+/* Focus States */
+.stChatInput input:focus {
+    outline: none;
+    border-color: var(--secondary-green) !important;
+}
+
+/* Welcome Box for Front Page */
+.welcome-box {
+    background: linear-gradient(135deg, 
+        rgba(16, 185, 129, 0.15) 0%, 
+        rgba(5, 150, 105, 0.1) 50%, 
+        rgba(34, 197, 94, 0.05) 100%
+    );
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    padding: 2rem 1.5rem;
+    margin: 1rem 0;
+    text-align: center;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 15px 30px rgba(16, 185, 129, 0.1);
+    position: relative;
+    overflow: hidden;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.welcome-box::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(16, 185, 129, 0.05), transparent);
+    animation: shimmer 4s infinite;
+}
+
+.welcome-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--secondary-green);
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+}
+
+.welcome-message {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.topic-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.topic-button {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.1));
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 10px;
+    padding: 0.6rem 1.2rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.topic-button:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.2));
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
+}
+
+/* Enhanced Spinner */
+.stSpinner > div {
+    border-color: var(--secondary-green) !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
-# --- END: Enhanced Custom CSS ---
+# --- END: Premium Modern CSS ---
 
-# Ollama API configuration
+def encode_image(image_bytes):
+    return base64.b64encode(image_bytes).decode('utf-8')
+
+# Ollama + FAISS Configuration
 OLLAMA_URL = "http://localhost:11434"
-VECTOR_STORE_DIR = "agricultural_vector_store"  # Directory containing your vector store
+VECTOR_STORE_DIR = "agricultural_vector_store"
 
 class VectorStoreManager:
-    """Manages the FAISS vector store for document retrieval"""
-    
     def __init__(self, vector_store_dir: str):
         self.vector_store_dir = Path(vector_store_dir)
         self.index = None
@@ -323,21 +486,16 @@ class VectorStoreManager:
         self.chunks_metadata = []
         self.dimension = 768
         self.loaded = False
-        
+
     def load_vector_store(self):
-        """Load the FAISS vector store"""
         try:
             index_path = self.vector_store_dir / "faiss_index.bin"
             metadata_path = self.vector_store_dir / "metadata.pkl"
             
             if not index_path.exists() or not metadata_path.exists():
-                st.error(f"Vector store not found in {self.vector_store_dir}")
                 return False
-            
-            # Load FAISS index
+                
             self.index = faiss.read_index(str(index_path))
-            
-            # Load metadata
             with open(metadata_path, 'rb') as f:
                 data = pickle.load(f)
                 self.documents = data['documents']
@@ -346,126 +504,93 @@ class VectorStoreManager:
             
             self.loaded = True
             return True
-            
         except Exception as e:
-            st.error(f"Error loading vector store: {e}")
+            st.error(f"❌ Error loading vector store: {e}")
             return False
-    
-    def get_embedding(self, text: str, model_name: str = "nomic-embed-text"):
-        """Get embedding for text using Ollama"""
+
+    def get_embedding(self, text: str, model_name="nomic-embed-text"):
         try:
             response = requests.post(
                 f"{OLLAMA_URL}/api/embeddings",
-                json={
-                    "model": model_name,
-                    "prompt": text
-                },
+                json={"model": model_name, "prompt": text},
                 timeout=30
             )
             response.raise_for_status()
             return response.json()["embedding"]
         except Exception as e:
-            st.error(f"Error getting embedding: {e}")
+            st.error(f"🔗 Embedding error: {e}")
             return None
-    
-    def search_similar_documents(self, query: str, k: int = 3):
-        """Search for similar documents in the vector store"""
+
+    def search_similar_documents(self, query: str, k=3):
         if not self.loaded:
             return []
         
-        # Get query embedding
-        query_embedding = self.get_embedding(query)
-        if query_embedding is None:
+        embedding = self.get_embedding(query)
+        if embedding is None:
             return []
         
-        try:
-            # Normalize query embedding
-            query_array = np.array([query_embedding]).astype('float32')
-            faiss.normalize_L2(query_array)
-            
-            # Search
-            scores, indices = self.index.search(query_array, k)
-            
-            results = []
-            for score, idx in zip(scores[0], indices[0]):
-                if idx < len(self.documents) and score > 0.1:  # Threshold for relevance
-                    results.append({
-                        'content': self.documents[idx],
-                        'metadata': self.chunks_metadata[idx],
-                        'score': float(score)
-                    })
-            
-            return results
-            
-        except Exception as e:
-            st.error(f"Error searching vector store: {e}")
-            return []
+        query_array = np.array([embedding]).astype('float32')
+        faiss.normalize_L2(query_array)
+        scores, indices = self.index.search(query_array, k)
+        
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < len(self.documents) and score > 0.1:
+                results.append({
+                    "content": self.documents[idx],
+                    "metadata": self.chunks_metadata[idx],
+                    "score": float(score)
+                })
+        return results
 
-# System prompt for the agricultural assistant
-SYSTEM_PROMPT = """You are KrishiSakhi, a knowledgeable and friendly agricultural assistant and farmer's best friend. You have deep expertise in farming, agriculture, and rural development. Your personality is warm, supportive, and practical.
+# Enhanced System Prompt
+SYSTEM_PROMPT = """You are KrishiSakhi, an advanced AI agricultural assistant with deep expertise in farming practices.
 
-Your expertise includes:
-🌾 **Crop Management**: Planting schedules, crop selection, rotation strategies, harvesting techniques
-🐛 **Pest & Disease Control**: Identification, prevention, organic and chemical treatment options
-🌱 **Seasonal Farming**: Crop recommendations for different seasons (Kharif, Rabi, Zaid)
-🌦️ **Weather & Climate**: Impact analysis, adaptation strategies, climate-resilient farming
-💧 **Irrigation & Water Management**: Efficient watering, drip irrigation, water conservation
-🌿 **Sustainable Practices**: Organic farming, soil health, composting, natural fertilizers
-💰 **Farm Economics**: Cost optimization, market trends, profit maximization, subsidies
-🚜 **Farm Equipment**: Machinery recommendations, maintenance, modern farming tools
-🌾 **Post-Harvest**: Storage techniques, value addition, processing, marketing
+You provide:
+✅ Practical, actionable advice for crop management
+✅ Pest and disease identification and treatment
+✅ Weather-based farming recommendations  
+✅ Sustainable and organic farming methods
+✅ Cost-effective solutions for small and large farmers
+✅ Soil health and irrigation guidance
+✅ Market trends and crop economics
 
-**Your communication style:**
-- Address farmers as "friend" or "bhai/behan" occasionally
-- Use simple, practical language that farmers can easily understand
-- Provide actionable advice with specific steps
-- Consider local farming conditions and traditional knowledge
-- Be encouraging and supportive, especially during challenges
-- Include relevant seasonal timing and regional considerations
-- Mention specific crop varieties, fertilizer quantities, and treatment dosages when appropriate
+Always prioritize:
+- Farmer safety and environmental sustainability
+- Cost-effectiveness and resource efficiency
+- Local climate and soil conditions
+- Simple, implementable solutions
 
-**Important guidelines:**
-- Always prioritize farmer safety when recommending pesticides or chemicals
-- Suggest integrated pest management approaches
-- Consider cost-effectiveness for small farmers
-- Recommend both traditional and modern approaches when relevant
-- Encourage sustainable and environmentally friendly practices
+Communicate in a warm, supportive manner using clear, practical language that farmers can easily understand and apply.
+"""
 
-When using information from the knowledge base, integrate it naturally into your responses and cite the sources when providing specific data or recommendations.
-
-Remember, you're not just an AI - you're a trusted friend who understands the challenges of farming life and wants to help farmers succeed and thrive."""
-
-def get_available_models() -> List[str]:
-    """Fetch available models from Ollama"""
+def get_available_models():
+    """Fetch available Ollama models"""
     try:
-        response = requests.get(f"{OLLAMA_URL}/api/tags")
+        response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
         if response.status_code == 200:
-            models = response.json()
-            return [model["name"] for model in models.get("models", [])]
-        else:
-            return []
-    except requests.exceptions.RequestException:
+            data = response.json()
+            return [model["name"] for model in data.get("models", [])]
+        return []
+    except:
         return []
 
-def create_enhanced_prompt(user_query: str, context_docs: List[Dict]) -> str:
-    """Create enhanced prompt with context from vector store"""
-    context_text = ""
+def create_enhanced_prompt(user_query: str, retrieved_docs: List[Dict]):
+    """Create context-enhanced prompt with retrieved documents"""
+    context = ""
+    if retrieved_docs:
+        context = "\n📚 **Relevant Knowledge Base Information:**\n"
+        for i, doc in enumerate(retrieved_docs, 1):
+            filename = doc['metadata'].get('filename', 'Unknown')
+            content_preview = doc['content'][:400] + "..." if len(doc['content']) > 400 else doc['content']
+            context += f"\n**[Source {i} - {filename}]:**\n{content_preview}\n"
     
-    if context_docs:
-        context_text = "\n**Relevant Information from Knowledge Base:**\n"
-        for i, doc in enumerate(context_docs, 1):
-            context_text += f"\n[Source {i} - {doc['metadata']['filename']}]:\n"
-            context_text += f"{doc['content'][:500]}...\n"
-        
-        context_text += "\n**Based on the above information and your agricultural expertise, please answer the farmer's question:**\n"
-    
-    enhanced_query = f"{context_text}\n**Farmer's Question:** {user_query}"
-    return enhanced_query
+    enhanced_prompt = f"{context}\n\n🌾 **Farmer's Question:** {user_query}"
+    return enhanced_prompt
 
-def stream_chat_response(model: str, messages: List[Dict], temperature: float = 0.7) -> Generator[str, None, None]:
+def stream_chat_response(model: str, messages: List[Dict], temperature: float = 0.7):
     """Stream chat response from Ollama"""
     url = f"{OLLAMA_URL}/api/chat"
-    
     payload = {
         "model": model,
         "messages": messages,
@@ -477,284 +602,301 @@ def stream_chat_response(model: str, messages: List[Dict], temperature: float = 
     }
     
     try:
-        with requests.post(url, json=payload, stream=True) as response:
+        with requests.post(url, json=payload, stream=True, timeout=120) as response:
             if response.status_code == 200:
                 for line in response.iter_lines():
                     if line:
                         try:
-                            chunk = json.loads(line.decode('utf-8'))
-                            if 'message' in chunk and 'content' in chunk['message']:
-                                yield chunk['message']['content']
-                            if chunk.get('done', False):
+                            chunk = json.loads(line.decode())
+                            if "message" in chunk and "content" in chunk["message"]:
+                                yield chunk["message"]["content"]
+                            if chunk.get("done"):
                                 break
                         except json.JSONDecodeError:
                             continue
             else:
-                yield f"Error: HTTP {response.status_code}"
-    except requests.exceptions.RequestException as e:
-        yield f"Connection error: {str(e)}"
+                yield f"❌ Server Error: {response.status_code}"
+    except Exception as e:
+        yield f"❌ Connection Error: {str(e)}"
 
-def check_ollama_connection() -> bool:
-    """Check if Ollama is running"""
+def check_ollama_connection():
+    """Check if Ollama is running and accessible"""
     try:
         response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
         return response.status_code == 200
-    except requests.exceptions.RequestException:
+    except:
         return False
+
+def render_status_indicator(status_type: str, message: str, icon: str = ""):
+    """Render a modern status indicator"""
+    return f"""
+    <div class="status-indicator status-{status_type}">
+        <span>{icon}</span>
+        <span>{message}</span>
+    </div>
+    """
 
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "selected_model" not in st.session_state:
     st.session_state.selected_model = None
-
 if "vector_store" not in st.session_state:
     st.session_state.vector_store = VectorStoreManager(VECTOR_STORE_DIR)
+if "conversation_count" not in st.session_state:
+    st.session_state.conversation_count = 0
 
-# Main header
-st.markdown("""
-<div class="main-header">
-    <h1>🌾 KrishiSakhiAI</h1>
-    <p>Your AI-Powered Agricultural Assistant with Knowledge Base</p>
-</div>
-""", unsafe_allow_html=True)
+# Header removed as requested
 
-# Sidebar configuration
+# Enhanced Sidebar with Modern Design
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">⚙️ Configuration</div>', unsafe_allow_html=True)
+    st.markdown("### ⚙️ Configuration Panel")
     
     # Check Ollama connection
-    if check_ollama_connection():
-        st.markdown('<div class="status-box status-success">🟢 Ollama Server Connected</div>', unsafe_allow_html=True)
+    ollama_connected = check_ollama_connection()
+    
+    if ollama_connected:
+        st.markdown(render_status_indicator("success", "Ollama Connected", "🟢"), unsafe_allow_html=True)
         
-        # Check vector store
+        # Load vector store if not already loaded
         if not st.session_state.vector_store.loaded:
-            with st.spinner("Loading knowledge base..."):
+            with st.spinner("🔄 Loading agricultural knowledge base..."):
                 if st.session_state.vector_store.load_vector_store():
-                    st.markdown('<div class="status-box status-success">📚 Knowledge Base Loaded</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="kb-info">📊 <strong>KB Info:</strong><br>📄 Chunks: {len(st.session_state.vector_store.chunks_metadata)}<br>🧠 Dim: {st.session_state.vector_store.dimension}</div>', unsafe_allow_html=True)
+                    st.markdown(render_status_indicator("info", "Knowledge Base Ready", "📚"), unsafe_allow_html=True)
                 else:
-                    st.markdown('<div class="status-box status-warning">⚠️ Knowledge Base Not Found</div>', unsafe_allow_html=True)
-                    st.markdown("Please run the document indexer first.")
+                    st.markdown(render_status_indicator("warning", "Knowledge Base Not Found", "⚠️"), unsafe_allow_html=True)
         else:
-            st.markdown('<div class="status-box status-success">📚 Knowledge Base Ready</div>', unsafe_allow_html=True)
+            st.markdown(render_status_indicator("info", "Knowledge Base Ready", "📚"), unsafe_allow_html=True)
         
-        # Get available models
+        # Model selection - Filter out embedding models
         available_models = get_available_models()
+        # Filter out embedding models from the UI
+        chat_models = [model for model in available_models if not any(embed_keyword in model.lower() for embed_keyword in ['embed', 'embedding', 'nomic-embed'])]
         
-        if available_models:
-            st.markdown("### 🤖 Model Selection")
-            selected_model = st.selectbox(
-                "Choose AI Model:",
-                available_models,
-                index=0 if not st.session_state.selected_model else 
-                      (available_models.index(st.session_state.selected_model) 
-                       if st.session_state.selected_model in available_models else 0)
+        if chat_models:
+            default_model = None
+            if "llama3.2" in chat_models:
+                default_model = chat_models.index("llama3.2")
+            elif chat_models:
+                default_model = 0
+                
+            st.session_state.selected_model = st.selectbox(
+                "🤖 Choose AI Model",
+                chat_models,
+                index=default_model,
+                help="Select the language model for conversations"
             )
-            st.session_state.selected_model = selected_model
             
-            # Vector search settings
-            st.markdown("### 🔍 Search Settings")
-            use_vector_search = st.checkbox("Enable Knowledge Base Search", value=True)
-            if use_vector_search:
-                search_results_count = st.slider("Context Documents", 1, 5, 3)
+            # Advanced settings
+            st.markdown("### 🔧 Advanced Settings")
+            
+            use_knowledge_base = st.checkbox(
+                "📖 Enable Knowledge Base Search", 
+                value=True,
+                help="Use agricultural knowledge base for enhanced responses"
+            )
+            
+            if use_knowledge_base:
+                k_documents = st.slider(
+                    "📄 Context Documents", 
+                    min_value=1, 
+                    max_value=5, 
+                    value=3,
+                    help="Number of relevant documents to include"
+                )
             else:
-                search_results_count = 0
-            
-            # Temperature control
-            st.markdown("### 🌡️ Response Settings")
+                k_documents = 0
+                
             temperature = st.slider(
-                "Creativity Level:",
-                min_value=0.0,
-                max_value=2.0,
-                value=0.7,
+                "🎨 Response Creativity", 
+                min_value=0.0, 
+                max_value=2.0, 
+                value=0.7, 
                 step=0.1,
-                help="Lower values = more focused responses, Higher values = more creative responses"
+                help="Lower values = more focused, Higher values = more creative"
             )
             
-            # Model info
-            st.markdown("### 📊 Current Setup")
-            st.info(f"**Active Model:** {selected_model}\n\n**Knowledge Base:** {'Enabled' if use_vector_search else 'Disabled'}\n\n**Creativity:** {temperature}")
-            
+            # Stats section
+            st.markdown("### 📊 Session Statistics")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-value">{len(st.session_state.messages)}</div>
+                    <div class="metric-label">Messages</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-value">{st.session_state.conversation_count}</div>
+                    <div class="metric-label">Queries</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
         else:
-            st.markdown('<div class="status-box status-warning">⚠️ No Models Available</div>', unsafe_allow_html=True)
-            st.markdown("### 📥 Setup Instructions")
-            st.code("ollama pull llama2", language="bash")
-            st.code("ollama pull mistral", language="bash")
-            
+            st.markdown(render_status_indicator("error", "No Chat Models Available", "❌"), unsafe_allow_html=True)
+            st.markdown("""
+            **Setup Instructions:**
+            ```bash
+            # Install required models
+            ollama pull llama3.2
+            ollama pull llava
+            ollama pull nomic-embed-text
+            ```
+            """)
     else:
-        st.markdown('<div class="status-box status-error">🔴 Ollama Server Offline</div>', unsafe_allow_html=True)
-        st.markdown("### 🚀 Quick Start")
-        st.code("ollama serve", language="bash")
+        st.markdown(render_status_indicator("error", "Ollama Offline", "🔴"), unsafe_allow_html=True)
+        st.markdown("""
+        **To start Ollama:**
+        ```bash
+        ollama serve
+        ```
+        """)
     
     # Clear chat button
-    st.markdown("---")
-    if st.button("🗑️ Clear Chat History", use_container_width=True):
+    if st.button("🗑️ Clear Conversation", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.conversation_count = 0
         st.rerun()
-    
-    # Instructions
-    st.markdown("---")
+
+# Main Chat Interface
+chat_container = st.container()
+
+# Show welcome message only if no conversation has started
+if len(st.session_state.messages) == 0:
     st.markdown("""
-    <div class="instructions-card">
-        <h4>🌱 Getting Started</h4>
-        <ol>
-            <li><strong>Start Ollama:</strong> Run <code>ollama serve</code></li>
-            <li><strong>Install Models:</strong> Pull your preferred AI model</li>
-            <li><strong>Create Knowledge Base:</strong> Run the document indexer</li>
-            <li><strong>Ask Questions:</strong> Get expert agricultural advice!</li>
-        </ol>
-        
-        <h4>🎯 Sample Questions:</h4>
-        <ul>
-            <li>"What crops should I plant in Kharif season?"</li>
-            <li>"How to control aphids on my tomato crop?"</li>
-            <li>"Best fertilizer schedule for wheat?"</li>
-        </ul>
+    <div class="welcome-box">
+        <h2 class="welcome-title">🙏 Namaste! Welcome to KrishiSakhiAI!</h2>
+        <p class="welcome-message">
+            Hello, friend! I'm KrishiSakhi, your helpful agricultural assistant. I'm here 
+            to provide you with expert advice and support for all your farming needs.
+        </p>
+        <p class="welcome-message">
+            Feel free to ask me anything about:
+        </p>
+        <div class="topic-buttons">
+            <div class="topic-button">🌱 Crop Management</div>
+            <div class="topic-button">🐛 Pest and Disease Control</div>
+            <div class="topic-button">💧 Irrigation</div>
+            <div class="topic-button">💰 Farm Economics</div>
+        </div>
+        <p class="welcome-message" style="margin-top: 2rem; font-size: 1.1rem;">
+            Let's start! Just type your question below.
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-# Check if we can proceed
-if not check_ollama_connection():
-    st.error("🚫 Please start Ollama server first: `ollama serve`")
-    st.markdown("""
-    ### 🔧 Troubleshooting
-    1. **Install Ollama:** Visit [ollama.ai](https://ollama.ai) to download
-    2. **Start Server:** Run `ollama serve` in your terminal
-    3. **Install Models:** Use `ollama pull llama2` or similar
-    4. **Install Embedding Model:** Run `ollama pull nomic-embed-text`
-    5. **Refresh Page:** Come back once Ollama is running
-    """)
-    st.stop()
-
-if not st.session_state.selected_model:
-    st.warning("🎯 Please select an AI model from the sidebar to start chatting")
-    st.stop()
-
-# Display chat messages
-chat_container = st.container()
-
 with chat_container:
-    if not st.session_state.messages:
-        # Use columns for a more balanced welcome screen
-        col1, col2, col3 = st.columns([1, 4, 1])
-        with col2:
-            st.markdown("""
-            <div class="welcome-content">
-                <h3>🙏 Namaste! Welcome to KrishiSakhiAI!</h3>
-                
-                
-                
-               
-                
-              
-            
-            """, unsafe_allow_html=True)
-    
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
+            # Display uploaded image if present
+            if message["role"] == "user" and "image" in message:
+                st.image(message["image"], width=200, caption="Uploaded Image")
+            
             st.markdown(message["content"])
             
-            # Show sources if available
+            # Display sources if available
             if "sources" in message and message["sources"]:
                 with st.expander("📚 Knowledge Base Sources"):
                     for i, source in enumerate(message["sources"], 1):
-                        st.markdown(f"""
-                        <div class="source-citation">
-                        <strong>Source {i}:</strong> {source['metadata']['filename']} 
-                        (Chunk {source['metadata']['chunk_index']+1}/{source['metadata']['total_chunks']})
-                        <br><small>Relevance Score: {source['score']:.3f}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        filename = source["metadata"].get("filename", "Unknown")
+                        score = source.get("score", 0)
+                        st.markdown(f"**{i}. {filename}** (Relevance: {score:.3f})")
+                        st.markdown(f"```\n{source['content'][:200]}...\n```")
 
-# Chat input
-if prompt := st.chat_input("🌾 Ask KrishiSakhi anything about farming..."):
-    # Add user message to chat
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Image Upload Section
+uploaded_image = st.file_uploader(
+    "📷 Upload Crop/Plant Image (Optional)",
+    type=["png", "jpg", "jpeg", "webp"],
+    help="Upload images of crops, plants, pests, or diseases for visual analysis"
+)
+
+# Enhanced Chat Input
+if prompt := st.chat_input("🌱 Ask KrishiSakhi about farming, crops, pests, weather, or any agricultural topic..."):
+    # Handle image upload
+    image_bytes = None
+    base64_image = None
     
+    if uploaded_image is not None:
+        image_bytes = uploaded_image.getvalue()
+        base64_image = encode_image(image_bytes)
+
+    # Create user message
+    user_message = {"role": "user", "content": prompt}
+    if image_bytes:
+        user_message["image"] = image_bytes
+        user_message["base64_image"] = base64_image
+
+    st.session_state.messages.append(user_message)
+    st.session_state.conversation_count += 1
+
     # Display user message
     with st.chat_message("user"):
+        if image_bytes:
+            st.image(image_bytes, width=200, caption="Uploaded Image")
         st.markdown(prompt)
-    
-    # Generate and display assistant response
+
+    # Generate AI response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
         
-        # Search vector store if enabled
-        relevant_docs = []
-        if use_vector_search and st.session_state.vector_store.loaded:
+        # Auto-switch to vision model if image is uploaded
+        selected_model = st.session_state.selected_model
+        if image_bytes and "llava" not in selected_model.lower():
+            # Try to find a vision-capable model
+            vision_models = [m for m in get_available_models() if "llava" in m.lower()]
+            if vision_models:
+                selected_model = vision_models[0]
+                st.info(f"🔍 Image detected → Switching to **{selected_model}** for visual analysis")
+            else:
+                st.warning("⚠️ No vision model available. Install llava: `ollama pull llava`")
+
+        # Retrieve relevant documents
+        retrieved_documents = []
+        if use_knowledge_base and st.session_state.vector_store.loaded:
             with st.spinner("🔍 Searching knowledge base..."):
-                relevant_docs = st.session_state.vector_store.search_similar_documents(
-                    prompt, k=search_results_count
+                retrieved_documents = st.session_state.vector_store.search_similar_documents(
+                    prompt, k_documents
                 )
-        
+
         # Create enhanced prompt with context
-        enhanced_prompt = create_enhanced_prompt(prompt, relevant_docs)
+        enhanced_prompt = create_enhanced_prompt(prompt, retrieved_documents)
         
-        # Convert chat history to Ollama format
+        # Prepare messages for Ollama API
         ollama_messages = []
-        for msg in st.session_state.messages[:-1]:  # Exclude the current user message
-            ollama_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
-        
-        # Add the enhanced current message
-        ollama_messages.append({
-            "role": "user",
-            "content": enhanced_prompt
-        })
-        
+        for msg in st.session_state.messages:
+            content = enhanced_prompt if msg == user_message else msg["content"]
+            ollama_msg = {"role": msg["role"], "content": content}
+            
+            # Add image for vision models
+            if "base64_image" in msg and msg["role"] == "user":
+                ollama_msg["images"] = [msg["base64_image"]]
+                
+            ollama_messages.append(ollama_msg)
+
         # Stream the response
-        try:
-            for chunk in stream_chat_response(
-                st.session_state.selected_model, 
-                ollama_messages, 
-                temperature
-            ):
-                full_response += chunk
-                message_placeholder.markdown(full_response + "▌")
+        for chunk in stream_chat_response(selected_model, ollama_messages, temperature):
+            full_response += chunk
+            message_placeholder.markdown(full_response + "▌")
+        
+        # Final response without cursor
+        message_placeholder.markdown(full_response)
+
+        # Save assistant response
+        assistant_message = {"role": "assistant", "content": full_response}
+        if retrieved_documents:
+            assistant_message["sources"] = retrieved_documents
             
-            message_placeholder.markdown(full_response)
-            
-            # Add assistant response to chat history with sources
-            assistant_message = {
-                "role": "assistant", 
-                "content": full_response
-            }
-            
-            if relevant_docs:
-                assistant_message["sources"] = relevant_docs
-            
-            st.session_state.messages.append(assistant_message)
-            
-            # Show sources
-            if relevant_docs:
-                with st.expander("📚 Knowledge Base Sources Used"):
-                    for i, source in enumerate(relevant_docs, 1):
-                        st.markdown(f"""
-                        <div class="source-citation">
-                        <strong>Source {i}:</strong> {source['metadata']['filename']} 
-                        (Chunk {source['metadata']['chunk_index']+1}/{source['metadata']['total_chunks']})
-                        <br><small>Relevance Score: {source['score']:.3f}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"❌ Error generating response: {str(e)}")
+        st.session_state.messages.append(assistant_message)
 
 # Footer
 st.markdown("---")
 st.markdown("""
-<div class="footer">
-    <div style="display: flex; justify-content: center; align-items: center; gap: 2rem;">
-        <div>🌾 <strong>KrishiSakhiAI</strong></div>
-        <div>•</div>
-        <div>Powered by <strong>Ollama</strong> & <strong>FAISS Vector Store</strong></div>
-        <div>•</div>
-        <div>🚜 Empowering Farmers with AI & Knowledge</div>
-    </div>
+<div style="text-align: center; padding: 2rem; color: #64748b;">
+    <p><strong>KrishiSakhiAI</strong> - Empowering farmers with AI-powered agricultural insights</p>
+    <p style="font-size: 0.9rem;">Built with ❤️ for the farming community | Powered by Ollama & Streamlit</p>
 </div>
 """, unsafe_allow_html=True)
