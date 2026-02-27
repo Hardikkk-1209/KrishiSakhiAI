@@ -3,7 +3,7 @@ KrishiSakhiAI — FastAPI Backend Server
 Replaces Streamlit; serves HTML/CSS/JS frontend + REST API
 """
 
-import os, sys, json, requests, pickle, numpy as np, pandas as pd
+import os, sys, json, base64, requests, pickle, numpy as np, pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -188,6 +188,13 @@ class ChatRequest(BaseModel):
     temperature: float = 0.7
     history: list = []
     farmer_profile: Optional[dict] = None
+    language: str = "English"
+
+LANG_INSTRUCTIONS = {
+    "English": "",
+    "Hindi": "\n\nIMPORTANT: You MUST respond entirely in Hindi (Devanagari script). Use Hindi for all explanations, advice, and responses. Example: 'नमस्ते किसान भाई!'",
+    "Marathi": "\n\nIMPORTANT: You MUST respond entirely in Marathi (Devanagari script). Use Marathi for all explanations, advice, and responses. Example: 'नमस्कार शेतकरी मित्रा!'",
+}
 
 class LivestockReading(BaseModel):
     body_temp: float = 38.8
@@ -278,7 +285,7 @@ async def get_vet_resources():
     return {"resources": VET_RESOURCES}
 
 # ── Chat (Streaming) ──
-def build_system_prompt(farmer_profile: dict = None):
+def build_system_prompt(farmer_profile: dict = None, language: str = "English"):
     base = """You are KrishiSakhi, an advanced AI agricultural assistant with deep expertise in farming practices.
 
 You provide:
@@ -312,12 +319,15 @@ Common Crops: {common}
 Rare Crop Opportunities: {rare}
 
 Tailor ALL answers to this farmer's region, soil, climate, water source, and land size. Address by name when appropriate."""
+
+    # Add language instruction
+    base += LANG_INSTRUCTIONS.get(language, "")
     return base
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    system_prompt = build_system_prompt(req.farmer_profile)
+    system_prompt = build_system_prompt(req.farmer_profile, req.language)
     messages = [{"role": "system", "content": system_prompt}]
     for msg in req.history[-10:]:  # last 10 messages for context
         messages.append(msg)
@@ -344,6 +354,44 @@ async def chat(req: ChatRequest):
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Image Upload & Analysis ──
+@app.post("/api/analyze-image")
+async def analyze_image(file: UploadFile = File(...), question: str = "What crop disease or pest do you see? Provide diagnosis, treatment, and prevention.", model: str = "llava", language: str = "English"):
+    """Analyze a crop/livestock image using Ollama vision model"""
+    image_bytes = await file.read()
+    img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+
+    lang_note = LANG_INSTRUCTIONS.get(language, "")
+    full_question = f"""You are KrishiSakhi, an expert agricultural AI assistant. Analyze this image carefully.
+
+{question}
+
+Provide your response in this format:
+1. **Identification**: What do you see? (crop, disease, pest, soil issue, livestock condition)
+2. **Diagnosis**: What is the likely problem?
+3. **Symptoms observed**: Describe visible symptoms
+4. **Treatment**: Recommend specific treatments and pesticides/fungicides with dosage
+5. **Prevention**: How to prevent this in the future
+6. **Urgency**: Rate urgency (Low / Medium / High / Critical)
+{lang_note}"""
+
+    try:
+        resp = requests.post(
+            f"{OLLAMA_URL}/api/chat",
+            json={"model": model, "messages": [{"role": "user", "content": full_question, "images": [img_b64]}],
+                  "stream": False, "options": {"temperature": 0.3}},
+            timeout=120
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            answer = result.get("message", {}).get("content", "Could not analyze the image.")
+            return {"analysis": answer, "model_used": model}
+        else:
+            return {"analysis": "⚠️ Vision model (llava) not available. Install with: ollama pull llava", "model_used": "none"}
+    except Exception as e:
+        raise HTTPException(500, f"Image analysis failed: {str(e)}")
 
 
 # ── Livestock Scan ──

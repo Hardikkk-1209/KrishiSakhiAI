@@ -9,6 +9,8 @@ let vaxRecords = JSON.parse(localStorage.getItem('vaxRecords') || '[]');
 let dietRecords = JSON.parse(localStorage.getItem('dietRecords') || '[]');
 let farmInputRecords = JSON.parse(localStorage.getItem('farmInputRecords') || '[]');
 let currentMode = 'chat';
+let selectedLang = localStorage.getItem('selectedLang') || 'English';
+let pendingImage = null; // holds File object for image analysis
 
 // ══════════════════════════════════════════
 // INIT
@@ -208,6 +210,8 @@ function completeOnboarding() {
     // Show sidebar elements
     document.getElementById('modeSelector').style.display = 'block';
     document.getElementById('resetProfileBtn').style.display = 'block';
+    document.getElementById('langSelector').style.display = 'block';
+    document.getElementById('langSelect').value = selectedLang;
 
     // Show farmer card in sidebar
     if (farmerProfile) {
@@ -232,6 +236,7 @@ function resetProfile() {
     document.getElementById('modeSelector').style.display = 'none';
     document.getElementById('resetProfileBtn').style.display = 'none';
     document.getElementById('farmerSidebar').style.display = 'none';
+    document.getElementById('langSelector').style.display = 'none';
     document.getElementById('chatMessages').innerHTML = `
         <div class="welcome-box">
             <h2>🙏 Namaste! Welcome to KrishiSakhiAI!</h2>
@@ -256,13 +261,19 @@ function clearChat() {
 async function sendMessage() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
-    if (!msg) return;
+    const hasImage = pendingImage !== null;
+    if (!msg && !hasImage) return;
     input.value = '';
 
     const messagesEl = document.getElementById('chatMessages');
-    // Remove welcome box
     const wb = messagesEl.querySelector('.welcome-box');
     if (wb) wb.remove();
+
+    // If we have an image, handle image analysis flow
+    if (hasImage) {
+        await analyzeImage(msg || 'What crop disease or pest do you see? Provide diagnosis, treatment, and prevention.');
+        return;
+    }
 
     // User message
     messagesEl.innerHTML += `
@@ -297,7 +308,8 @@ async function sendMessage() {
                 model: model,
                 temperature: temp,
                 history: chatHistory.slice(-10),
-                farmer_profile: farmerProfile
+                farmer_profile: farmerProfile,
+                language: selectedLang
             })
         });
 
@@ -353,6 +365,102 @@ function formatMarkdown(text) {
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
         .replace(/`(.+?)`/g, '<code style="background:rgba(16,185,129,0.15); padding:0.1rem 0.4rem; border-radius:4px; font-family:JetBrains Mono,monospace; font-size:0.85rem;">$1</code>')
         .replace(/\n/g, '<br>');
+}
+
+// ══════════════════════════════════════════
+// LANGUAGE
+// ══════════════════════════════════════════
+function onLangChange() {
+    selectedLang = document.getElementById('langSelect').value;
+    localStorage.setItem('selectedLang', selectedLang);
+}
+
+// ══════════════════════════════════════════
+// IMAGE UPLOAD & ANALYSIS
+// ══════════════════════════════════════════
+function previewImage(input) {
+    if (!input.files || !input.files[0]) return;
+    pendingImage = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        document.getElementById('imagePreview').style.display = 'block';
+        document.getElementById('imagePreview').innerHTML = `
+            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.6rem 1rem; background:rgba(16,185,129,0.1); border:1px solid var(--green); border-radius:12px;">
+                <img src="${e.target.result}" style="width:60px; height:60px; object-fit:cover; border-radius:8px;">
+                <div>
+                    <div style="color:var(--green); font-weight:600;">📷 Image ready for analysis</div>
+                    <div style="color:var(--text-dim); font-size:0.8rem;">${pendingImage.name} — Type a question or press Send</div>
+                </div>
+                <button onclick="clearImagePreview()" style="margin-left:auto; background:none; border:none; color:var(--red); font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+        `;
+    };
+    reader.readAsDataURL(pendingImage);
+}
+
+function clearImagePreview() {
+    pendingImage = null;
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('chatImageFile').value = '';
+}
+
+async function analyzeImage(question) {
+    const messagesEl = document.getElementById('chatMessages');
+    const sendBtn = document.getElementById('chatSendBtn');
+    sendBtn.disabled = true;
+
+    // Show user message with image preview
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        messagesEl.innerHTML += `
+            <div class="msg user">
+                <div class="msg-avatar">👤</div>
+                <div class="msg-bubble">
+                    <img src="${e.target.result}" style="max-width:200px; border-radius:8px; margin-bottom:0.5rem; display:block;">
+                    ${escapeHtml(question)}
+                </div>
+            </div>
+        `;
+    };
+    reader.readAsDataURL(pendingImage);
+
+    // AI thinking placeholder
+    const aiId = 'ai-' + Date.now();
+    messagesEl.innerHTML += `
+        <div class="msg ai" id="${aiId}">
+            <div class="msg-avatar">🌾</div>
+            <div class="msg-bubble"><span class="typing">🔍 Analyzing image...</span></div>
+        </div>
+    `;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+        const formData = new FormData();
+        formData.append('file', pendingImage);
+        formData.append('question', question);
+        formData.append('language', selectedLang);
+
+        const model = document.getElementById('modelSelect').value || 'llava';
+        formData.append('model', model);
+
+        const resp = await fetch(`${API}/api/analyze-image`, { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        const bubble = document.querySelector(`#${aiId} .msg-bubble`);
+        bubble.innerHTML = formatMarkdown(data.analysis);
+
+        chatHistory.push({ role: 'user', content: `[Image uploaded] ${question}` });
+        chatHistory.push({ role: 'assistant', content: data.analysis });
+
+    } catch (e) {
+        document.querySelector(`#${aiId} .msg-bubble`).innerHTML =
+            `<span style="color:var(--red);">❌ Image analysis failed. Make sure to run: <code>ollama pull llava</code></span>`;
+    }
+
+    clearImagePreview();
+    sendBtn.disabled = false;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 // ══════════════════════════════════════════
