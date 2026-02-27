@@ -10,7 +10,7 @@ let dietRecords = JSON.parse(localStorage.getItem('dietRecords') || '[]');
 let farmInputRecords = JSON.parse(localStorage.getItem('farmInputRecords') || '[]');
 let currentMode = 'chat';
 let selectedLang = localStorage.getItem('selectedLang') || 'English';
-let pendingImage = null; // holds File object for image analysis
+let pendingImage = null;
 
 // ══════════════════════════════════════════
 // INIT
@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadModels();
     loadRegions();
     setDefaultDates();
-
     if (farmerProfile) {
         completeOnboarding();
     } else {
@@ -33,11 +32,17 @@ async function checkHealth() {
         const r = await fetch(`${API}/api/health`);
         const data = await r.json();
         const el = document.getElementById('ollamaStatus');
-        el.className = 'status-badge ' + (data.ollama ? 'ok' : 'err');
-        el.innerHTML = data.ollama ? '🟢 Ollama Connected' : '🔴 Ollama Offline';
+        if (data.ollama) {
+            el.className = 'status-badge ok';
+            el.innerHTML = '<span class="dot dot-ok"></span>Ollama Connected';
+        } else {
+            el.className = 'status-badge err';
+            el.innerHTML = '<span class="dot dot-err"></span>Ollama Offline';
+        }
     } catch (e) {
-        document.getElementById('ollamaStatus').className = 'status-badge err';
-        document.getElementById('ollamaStatus').innerHTML = '🔴 Server Error';
+        const el = document.getElementById('ollamaStatus');
+        el.className = 'status-badge err';
+        el.innerHTML = '<span class="dot dot-err"></span>Server Error';
     }
 }
 
@@ -46,21 +51,21 @@ async function loadModels() {
         const r = await fetch(`${API}/api/models`);
         const data = await r.json();
         const sel = document.getElementById('modelSelect');
-        // Sort: chat models first, embedding models last
         const chatModels = data.models.filter(m => !m.includes('embed') && !m.includes('nomic'));
         const embedModels = data.models.filter(m => m.includes('embed') || m.includes('nomic'));
         const sorted = [...chatModels, ...embedModels];
         sel.innerHTML = sorted.map(m => `<option value="${m}">${m}</option>`).join('');
         if (sorted.length > 0) document.getElementById('modelSelector').style.display = 'block';
-    } catch (e) { }
+    } catch (e) {}
 }
 
 async function loadRegions() {
     try {
         const r = await fetch(`${API}/api/regions`);
         const data = await r.json();
-        document.getElementById('regRegion').innerHTML = data.regions.map(r => `<option value="${r}">${r}</option>`).join('');
-    } catch (e) { }
+        document.getElementById('regRegion').innerHTML =
+            data.regions.map(r => `<option value="${r}">${r}</option>`).join('');
+    } catch (e) {}
 }
 
 function setDefaultDates() {
@@ -87,8 +92,17 @@ function goStep(step) {
 
 function setMode(mode) {
     currentMode = mode;
-    document.querySelectorAll('.mode-tab[data-mode]').forEach(t => t.classList.remove('active'));
-    document.querySelector(`.mode-tab[data-mode="${mode}"]`).classList.add('active');
+    // Update sidebar seg buttons
+    document.querySelectorAll('.seg-btn[data-mode]').forEach(t => t.classList.remove('active'));
+    const sb = document.querySelector(`.seg-btn[data-mode="${mode}"]`);
+    if (sb) sb.classList.add('active');
+    // Update pill tabs
+    document.querySelectorAll('.pill-tab[data-mode]').forEach(t =>
+        t.classList.toggle('active', t.dataset.mode === mode));
+    // Update rail buttons
+    document.querySelectorAll('.rail-btn[id^="rb-"]').forEach(b => b.classList.remove('active'));
+    const rb = document.getElementById('rb-' + mode);
+    if (rb) rb.classList.add('active');
     showPage(mode === 'chat' ? 'pageChat' : 'pageLivestock');
 }
 
@@ -102,8 +116,8 @@ function submitRegistration() {
     const water = document.getElementById('regWater').value;
     const crop = document.getElementById('regCrop').value.trim();
     const region = document.getElementById('regRegion').value;
-
     const errEl = document.getElementById('regError');
+
     if (!name || !phone) {
         errEl.textContent = '❌ Please fill in your Name and Phone Number';
         errEl.style.display = 'block'; return;
@@ -113,7 +127,6 @@ function submitRegistration() {
         errEl.style.display = 'block'; return;
     }
     errEl.style.display = 'none';
-
     farmerProfile = { name, phone, land_size: land, water_source: water, current_crop: crop, region };
     localStorage.setItem('farmerProfile', JSON.stringify(farmerProfile));
     goStep(2);
@@ -128,37 +141,35 @@ async function renderCropPlan() {
         const r = await fetch(`${API}/api/crops/${region}`);
         const data = await r.json();
         const container = document.getElementById('cropPlanContent');
-
         let html = `
-            <div class="hero-box" style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.08));">
-                <h2 style="font-size:1.8rem;">🌾 Crop Planning — ${region}</h2>
-                <p>Welcome, <strong>${farmerProfile.name}</strong>! Here are crops for your region.</p>
+            <div class="ob-hero" style="margin-bottom:1.5rem;">
+                <div class="ob-tag">🌾 ${region} Region</div>
+                <h1 style="font-size:1.6rem;">Crop Planning for ${farmerProfile.name}</h1>
+                <p>Personalized recommendations based on your region and farm profile</p>
             </div>
             <div class="region-info">
-                <h4>📍 ${region} Region Profile</h4>
+                <h4>📍 ${region} Profile</h4>
                 <p><strong>Climate:</strong> ${data.climate}</p>
                 <p><strong>Soil Type:</strong> ${data.soil}</p>
-                <p><strong>Your Land:</strong> ${farmerProfile.land_size} acres | <strong>Water:</strong> ${farmerProfile.water_source}</p>
+                <p><strong>Your Land:</strong> ${farmerProfile.land_size} acres &nbsp;|&nbsp; <strong>Water:</strong> ${farmerProfile.water_source}</p>
             </div>
             <div class="section-label">🌱 Recommended Crops</div>
             <div class="crop-grid">
                 ${data.common.map(c => `<div class="crop-chip">🌿 ${c}</div>`).join('')}
             </div>
-            <div class="section-label">✨ Rare / Exotic Crop Opportunities</div>
+            <div class="section-label">✨ High-Value Rare Crops</div>
         `;
-
         data.rare.forEach(crop => {
             html += `
                 <div class="rare-card">
                     <h4>🌟 ${crop}</h4>
-                    <p>High-value crop rarely grown in ${region}. Explore disease management in the next step.</p>
-                </div>
-            `;
+                    <p>High-value opportunity rarely grown in ${region}. Disease management details in the next step.</p>
+                </div>`;
         });
-
         container.innerHTML = html;
     } catch (e) {
-        document.getElementById('cropPlanContent').innerHTML = '<div class="alert alert-red">Failed to load crop data</div>';
+        document.getElementById('cropPlanContent').innerHTML =
+            '<div class="alert alert-red">Failed to load crop data. Is the server running?</div>';
     }
 }
 
@@ -170,36 +181,32 @@ async function renderRareCrops() {
     try {
         const cropData = await (await fetch(`${API}/api/crops/${region}`)).json();
         const container = document.getElementById('rareCropContent');
-
         let html = `
-            <div class="hero-box" style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.08));">
-                <h2 style="font-size:1.8rem;">🔬 Rare Crop Disease Guide — ${region}</h2>
-                <p>Complete disease management for high-value crops in your region</p>
+            <div class="ob-hero" style="margin-bottom:1.5rem;">
+                <div class="ob-tag">🔬 Disease Management</div>
+                <h1 style="font-size:1.6rem;">Rare Crop Disease Guide — ${region}</h1>
+                <p>Complete disease management protocols for high-value crops in your area</p>
             </div>
         `;
-
         for (const crop of cropData.rare) {
             const diseaseResp = await fetch(`${API}/api/rare-crops/${crop}`);
             const diseaseData = await diseaseResp.json();
-
-            html += `<h3 style="color:var(--yellow); font-size:1.5rem; margin:1.5rem 0 0.5rem;">🌟 ${crop}</h3>`;
-
+            html += `<h3 style="color:#92400e; font-size:1.3rem; margin:1.5rem 0 0.5rem; font-weight:800;">🌟 ${crop}</h3>`;
             diseaseData.diseases.forEach(d => {
                 html += `
                     <div class="disease-card">
                         <h5>🦠 ${d.name}</h5>
-                        <div class="disease-section symptoms"><strong>⚠️ Symptoms:</strong>${d.symptoms}</div>
-                        <div class="disease-section prevention"><strong>🛡️ Preventive Measures:</strong>${d.prevention}</div>
-                        <div class="disease-section treatment"><strong>💊 Treatment:</strong>${d.treatment}</div>
-                        <div class="disease-section pesticide"><strong>🧪 Pesticides / Fungicides:</strong>${d.pesticides}</div>
-                    </div>
-                `;
+                        <div class="disease-section symptoms"><strong>⚠️ Symptoms</strong>${d.symptoms}</div>
+                        <div class="disease-section prevention"><strong>🛡️ Preventive Measures</strong>${d.prevention}</div>
+                        <div class="disease-section treatment"><strong>💊 Treatment</strong>${d.treatment}</div>
+                        <div class="disease-section pesticide"><strong>🧪 Pesticides / Fungicides</strong>${d.pesticides}</div>
+                    </div>`;
             });
         }
-
         container.innerHTML = html;
     } catch (e) {
-        document.getElementById('rareCropContent').innerHTML = '<div class="alert alert-red">Failed to load disease data</div>';
+        document.getElementById('rareCropContent').innerHTML =
+            '<div class="alert alert-red">Failed to load disease data.</div>';
     }
 }
 
@@ -207,22 +214,28 @@ async function renderRareCrops() {
 // COMPLETE ONBOARDING
 // ══════════════════════════════════════════
 function completeOnboarding() {
-    // Show sidebar elements
     document.getElementById('modeSelector').style.display = 'block';
     document.getElementById('resetProfileBtn').style.display = 'block';
     document.getElementById('langSelector').style.display = 'block';
     document.getElementById('langSelect').value = selectedLang;
 
-    // Show farmer card in sidebar
     if (farmerProfile) {
-        document.getElementById('farmerSidebar').style.display = 'block';
-        document.getElementById('farmerSidebar').innerHTML = `
+        const fSide = document.getElementById('farmerSidebar');
+        fSide.style.display = 'block';
+        fSide.innerHTML = `
             <div class="farmer-card">
                 <div class="name">👨‍🌾 ${farmerProfile.name}</div>
-                <div class="meta">📍 ${farmerProfile.region} • ${farmerProfile.land_size} acres</div>
-            </div>
-        `;
+                <div class="meta">📍 ${farmerProfile.region} &nbsp;·&nbsp; ${farmerProfile.land_size} acres</div>
+            </div>`;
+        // Update summary panel
+        const rv = document.getElementById('cspRegionVal');
+        if (rv) rv.textContent = farmerProfile.region || '—';
     }
+
+    const month = new Date().getMonth();
+    const seasons = ['Rabi','Rabi','Rabi','Summer','Summer','Kharif','Kharif','Kharif','Kharif','Rabi','Rabi','Rabi'];
+    const sv = document.getElementById('cspSeasonVal');
+    if (sv) sv.textContent = seasons[month] + ' Season';
 
     setMode('chat');
     loadLivestockData();
@@ -239,20 +252,31 @@ function resetProfile() {
     document.getElementById('langSelector').style.display = 'none';
     document.getElementById('chatMessages').innerHTML = `
         <div class="welcome-box">
-            <h2>🙏 Namaste! Welcome to KrishiSakhiAI!</h2>
-            <p>I'm KrishiSakhi, your AI farming assistant.</p>
-        </div>
-    `;
+            <div class="welcome-badge">🙏 Namaste!</div>
+            <h2>Welcome to KrishiSakhiAI</h2>
+            <p>Your AI-powered farming companion.</p>
+        </div>`;
 }
 
 function clearChat() {
     chatHistory = [];
     document.getElementById('chatMessages').innerHTML = `
         <div class="welcome-box">
-            <h2>🙏 Namaste! Welcome to KrishiSakhiAI!</h2>
-            <p>I'm KrishiSakhi, your AI farming assistant.</p>
-        </div>
-    `;
+            <div class="welcome-badge">🙏 Namaste!</div>
+            <h2>Welcome to KrishiSakhiAI</h2>
+            <p>Your AI-powered farming companion. Ask me anything!</p>
+            <div class="chip-row">
+                <button class="chip" onclick="useChip(this)">🌱 Best kharif crops for my region?</button>
+                <button class="chip" onclick="useChip(this)">🐛 How to control aphids organically?</button>
+                <button class="chip" onclick="useChip(this)">💧 Drip irrigation setup guide</button>
+                <button class="chip" onclick="useChip(this)">📈 Current MSP rates for wheat?</button>
+            </div>
+        </div>`;
+}
+
+function useChip(el) {
+    document.getElementById('chatInput').value = el.textContent.trim();
+    document.getElementById('chatInput').focus();
 }
 
 // ══════════════════════════════════════════
@@ -261,55 +285,51 @@ function clearChat() {
 async function sendMessage() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
-    const hasImage = pendingImage !== null;
-    if (!msg && !hasImage) return;
+    if (!msg && !pendingImage) return;
     input.value = '';
 
     const messagesEl = document.getElementById('chatMessages');
     const wb = messagesEl.querySelector('.welcome-box');
     if (wb) wb.remove();
 
-    // If we have an image, handle image analysis flow
-    if (hasImage) {
-        await analyzeImage(msg || 'What crop disease or pest do you see? Provide diagnosis, treatment, and prevention.');
+    if (pendingImage) {
+        await analyzeImage(msg || 'What crop disease or pest do you see? Give diagnosis, treatment, and prevention.');
         return;
     }
 
-    // User message
     messagesEl.innerHTML += `
         <div class="msg user">
             <div class="msg-avatar">👤</div>
             <div class="msg-bubble">${escapeHtml(msg)}</div>
-        </div>
-    `;
+        </div>`;
 
-    // AI placeholder
     const aiId = 'ai-' + Date.now();
     messagesEl.innerHTML += `
         <div class="msg ai" id="${aiId}">
             <div class="msg-avatar">🌾</div>
-            <div class="msg-bubble"><span class="typing">Thinking...</span></div>
-        </div>
-    `;
+            <div class="msg-bubble"><span class="typing">Thinking</span></div>
+        </div>`;
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
     const sendBtn = document.getElementById('chatSendBtn');
     sendBtn.disabled = true;
 
     try {
-        const model = document.getElementById('modelSelect').value || 'llama3.2:1b';
+        const model = document.getElementById('modelSelect').value || 'llama3.2';
         const temp = parseFloat(document.getElementById('temperature').value);
+        const useKB = document.getElementById('kbToggle') ? document.getElementById('kbToggle').checked : true;
 
         const response = await fetch(`${API}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: msg,
-                model: model,
+                model,
                 temperature: temp,
                 history: chatHistory.slice(-10),
                 farmer_profile: farmerProfile,
-                language: selectedLang
+                language: selectedLang,
+                use_kb: useKB
             })
         });
 
@@ -321,10 +341,8 @@ async function sendMessage() {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
             const chunk = decoder.decode(value);
             const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
-
             for (const line of lines) {
                 try {
                     const data = JSON.parse(line.slice(6));
@@ -333,10 +351,8 @@ async function sendMessage() {
                         bubble.innerHTML = formatMarkdown(fullResponse);
                         messagesEl.scrollTop = messagesEl.scrollHeight;
                     }
-                    if (data.error) {
-                        bubble.innerHTML = `<span style="color:var(--red);">❌ ${data.error}</span>`;
-                    }
-                } catch (e) { }
+                    if (data.error) bubble.innerHTML = `<span style="color:var(--red)">❌ ${data.error}</span>`;
+                } catch (e) {}
             }
         }
 
@@ -345,7 +361,7 @@ async function sendMessage() {
 
     } catch (e) {
         document.querySelector(`#${aiId} .msg-bubble`).innerHTML =
-            `<span style="color:var(--red);">❌ Failed to connect. Is Ollama running?</span>`;
+            `<span style="color:var(--red)">❌ Failed to connect. Is Ollama running?</span>`;
     }
 
     sendBtn.disabled = false;
@@ -359,11 +375,10 @@ function escapeHtml(text) {
 }
 
 function formatMarkdown(text) {
-    // Simple markdown formatting
     return text
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`(.+?)`/g, '<code style="background:rgba(16,185,129,0.15); padding:0.1rem 0.4rem; border-radius:4px; font-family:JetBrains Mono,monospace; font-size:0.85rem;">$1</code>')
+        .replace(/`([^`]+)`/g, '<code style="background:rgba(45,158,107,0.1);padding:1px 5px;border-radius:4px;font-family:DM Mono,monospace;font-size:0.85em">$1</code>')
         .replace(/\n/g, '<br>');
 }
 
@@ -382,18 +397,18 @@ function previewImage(input) {
     if (!input.files || !input.files[0]) return;
     pendingImage = input.files[0];
     const reader = new FileReader();
-    reader.onload = function (e) {
-        document.getElementById('imagePreview').style.display = 'block';
-        document.getElementById('imagePreview').innerHTML = `
-            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.6rem 1rem; background:rgba(16,185,129,0.1); border:1px solid var(--green); border-radius:12px;">
-                <img src="${e.target.result}" style="width:60px; height:60px; object-fit:cover; border-radius:8px;">
+    reader.onload = function(e) {
+        const prev = document.getElementById('imagePreview');
+        prev.style.display = 'block';
+        prev.innerHTML = `
+            <div style="display:flex;align-items:center;gap:0.8rem;padding:0.6rem 1rem;background:var(--green-lt);border:1px solid var(--green-mid);border-radius:var(--radius-sm);">
+                <img src="${e.target.result}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;">
                 <div>
-                    <div style="color:var(--green); font-weight:600;">📷 Image ready for analysis</div>
-                    <div style="color:var(--text-dim); font-size:0.8rem;">${pendingImage.name} — Type a question or press Send</div>
+                    <div style="color:var(--green);font-weight:600;font-size:0.85rem;">📷 Image ready</div>
+                    <div style="color:var(--text-dim);font-size:0.75rem;">${pendingImage.name} — press Send to analyze</div>
                 </div>
-                <button onclick="clearImagePreview()" style="margin-left:auto; background:none; border:none; color:var(--red); font-size:1.2rem; cursor:pointer;">✕</button>
-            </div>
-        `;
+                <button onclick="clearImagePreview()" style="margin-left:auto;background:none;border:none;color:var(--red);font-size:1.2rem;cursor:pointer;line-height:1;">✕</button>
+            </div>`;
     };
     reader.readAsDataURL(pendingImage);
 }
@@ -410,29 +425,25 @@ async function analyzeImage(question) {
     const sendBtn = document.getElementById('chatSendBtn');
     sendBtn.disabled = true;
 
-    // Show user message with image preview
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = function(e) {
         messagesEl.innerHTML += `
             <div class="msg user">
                 <div class="msg-avatar">👤</div>
                 <div class="msg-bubble">
-                    <img src="${e.target.result}" style="max-width:200px; border-radius:8px; margin-bottom:0.5rem; display:block;">
+                    <img src="${e.target.result}" style="max-width:180px;border-radius:8px;margin-bottom:0.4rem;display:block;">
                     ${escapeHtml(question)}
                 </div>
-            </div>
-        `;
+            </div>`;
     };
     reader.readAsDataURL(pendingImage);
 
-    // AI thinking placeholder
     const aiId = 'ai-' + Date.now();
     messagesEl.innerHTML += `
         <div class="msg ai" id="${aiId}">
             <div class="msg-avatar">🌾</div>
-            <div class="msg-bubble"><span class="typing">🔍 Analyzing image...</span></div>
-        </div>
-    `;
+            <div class="msg-bubble"><span class="typing">Analyzing image</span></div>
+        </div>`;
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
     try {
@@ -440,22 +451,16 @@ async function analyzeImage(question) {
         formData.append('file', pendingImage);
         formData.append('question', question);
         formData.append('language', selectedLang);
-
-        const model = document.getElementById('modelSelect').value || 'llava';
-        formData.append('model', model);
+        formData.append('model', document.getElementById('modelSelect').value || 'llava');
 
         const resp = await fetch(`${API}/api/analyze-image`, { method: 'POST', body: formData });
         const data = await resp.json();
-
-        const bubble = document.querySelector(`#${aiId} .msg-bubble`);
-        bubble.innerHTML = formatMarkdown(data.analysis);
-
-        chatHistory.push({ role: 'user', content: `[Image uploaded] ${question}` });
+        document.querySelector(`#${aiId} .msg-bubble`).innerHTML = formatMarkdown(data.analysis);
+        chatHistory.push({ role: 'user', content: `[Image] ${question}` });
         chatHistory.push({ role: 'assistant', content: data.analysis });
-
     } catch (e) {
         document.querySelector(`#${aiId} .msg-bubble`).innerHTML =
-            `<span style="color:var(--red);">❌ Image analysis failed. Make sure to run: <code>ollama pull llava</code></span>`;
+            `<span style="color:var(--red)">❌ Image analysis failed. Install llava: <code>ollama pull llava</code></span>`;
     }
 
     clearImagePreview();
@@ -464,7 +469,7 @@ async function analyzeImage(question) {
 }
 
 // ══════════════════════════════════════════
-// LIVESTOCK — TAB SWITCHING
+// LIVESTOCK — SWITCHING
 // ══════════════════════════════════════════
 function switchLsTab(idx) {
     document.querySelectorAll('.ls-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
@@ -474,7 +479,7 @@ function switchLsTab(idx) {
 function switchScanMode(mode, btn) {
     document.getElementById('scanManual').style.display = mode === 'manual' ? 'block' : 'none';
     document.getElementById('scanCsv').style.display = mode === 'csv' ? 'block' : 'none';
-    btn.parentElement.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    btn.closest('.scan-toggle-bar').querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
 }
 
@@ -482,14 +487,14 @@ function switchScanMode(mode, btn) {
 // LIVESTOCK — HEALTH SCAN
 // ══════════════════════════════════════════
 async function runScan() {
-    const fields = ['body_temp', 'heart_rate', 'respiratory_rate', 'activity_level', 'rumination_min',
-        'feed_intake', 'water_intake', 'milk_yield', 'lying_time', 'steps_count',
-        'gait_score', 'stance_symmetry', 'stride_length', 'ambient_temp', 'humidity_pct'];
-
+    const fields = ['body_temp','heart_rate','respiratory_rate','activity_level','rumination_min',
+        'feed_intake','water_intake','milk_yield','lying_time','steps_count',
+        'gait_score','stance_symmetry','stride_length','ambient_temp','humidity_pct'];
     const reading = {};
     fields.forEach(f => { reading[f] = parseFloat(document.getElementById('s_' + f).value); });
 
-    document.getElementById('scanResults').innerHTML = '<div class="alert alert-green">🔄 Running biosecurity scan...</div>';
+    document.getElementById('scanResults').innerHTML =
+        '<div class="alert alert-green" style="margin-top:1rem;">🔄 Running biosecurity scan…</div>';
 
     try {
         const r = await fetch(`${API}/api/livestock/scan`, {
@@ -498,52 +503,72 @@ async function runScan() {
             body: JSON.stringify(reading)
         });
         const data = await r.json();
-        renderScanResults(data);
+        if (data.error) {
+            document.getElementById('scanResults').innerHTML =
+                `<div class="alert alert-orange">${data.error}</div>`;
+        } else {
+            renderScanResults(data);
+        }
     } catch (e) {
-        document.getElementById('scanResults').innerHTML = '<div class="alert alert-red">❌ Scan failed: ' + e.message + '</div>';
+        document.getElementById('scanResults').innerHTML =
+            `<div class="alert alert-red">❌ Scan failed: ${e.message}</div>`;
     }
 }
 
 function renderScanResults(data) {
-    const healthColor = data.health.status_label === 'Healthy' ? 'green' : data.health.status_label === 'Stressed' ? 'orange' : 'red';
-    const anomalyColor = data.anomaly.is_anomaly ? 'red' : 'green';
-    const gaitColor = data.gait.gait_score < 2 ? 'green' : data.gait.gait_score < 3 ? 'orange' : 'red';
+    const h = data.health || {};
+    const a = data.anomaly || {};
+    const g = data.gait || {};
+    const d = data.disease || {};
+
+    const healthClass = h.status_label === 'Healthy' ? 'green' : h.status_label === 'Stressed' ? 'orange' : 'red';
+    const anomalyClass = a.is_anomaly ? 'red' : 'green';
+    const gaitScore = g.gait_score || 0;
+    const gaitClass = gaitScore < 2 ? 'green' : gaitScore < 3 ? 'orange' : 'red';
+    const diseaseName = (d.predicted_disease || '').replace(/_/g, ' ') || '—';
 
     document.getElementById('scanResults').innerHTML = `
         <div class="section-label" style="margin-top:1.5rem;">📊 Biosecurity Scan Results</div>
         <div class="result-grid">
-            <div class="card card-${healthColor}">
-                <div class="card-title">🏥 Health Status</div>
-                <div class="card-value">${data.health.status_label}</div>
-                <div class="card-sub">Confidence: ${(data.health.confidence * 100).toFixed(0)}%</div>
+            <div class="r-card ${healthClass}">
+                <div class="r-card-title">🏥 Health Status</div>
+                <div class="r-card-val">${h.status_label || '—'}</div>
+                <div class="r-card-sub">Confidence: ${h.confidence ? (h.confidence*100).toFixed(0) : '?'}%</div>
             </div>
-            <div class="card card-${anomalyColor}">
-                <div class="card-title">🔍 Anomaly Detection</div>
-                <div class="card-value">${data.anomaly.is_anomaly ? '⚠️ Anomaly' : '✅ Normal'}</div>
-                <div class="card-sub">Score: ${data.anomaly.anomaly_score?.toFixed(2) || 'N/A'}</div>
+            <div class="r-card ${anomalyClass}">
+                <div class="r-card-title">🔍 Anomaly Detection</div>
+                <div class="r-card-val">${a.is_anomaly ? '⚠️ Detected' : '✅ Normal'}</div>
+                <div class="r-card-sub">Score: ${a.anomaly_score != null ? a.anomaly_score.toFixed(4) : 'N/A'}</div>
             </div>
-            <div class="card card-${gaitColor}">
-                <div class="card-title">🦶 Gait Analysis</div>
-                <div class="card-value">${data.gait.gait_score?.toFixed(1) || 'N/A'}</div>
-                <div class="card-sub">${data.gait.gait_label || 'N/A'}</div>
+            <div class="r-card ${gaitClass}">
+                <div class="r-card-title">🦶 Gait Analysis</div>
+                <div class="r-card-val">${gaitScore.toFixed(1)} / 5</div>
+                <div class="r-card-sub">${g.lameness_label || g.gait_label || 'N/A'}</div>
             </div>
-            <div class="card">
-                <div class="card-title">🔮 Disease Forecast</div>
-                <div class="card-value" style="font-size:1.2rem; color:var(--yellow);">${(data.disease.predicted_disease || '').replace(/_/g, ' ')}</div>
-                <div class="card-sub">Risk: ${(data.disease.confidence * 100)?.toFixed(0) || '?'}%</div>
+            <div class="r-card yellow">
+                <div class="r-card-title">🦠 Disease Forecast</div>
+                <div class="r-card-val" style="font-size:1.1rem;">${diseaseName}</div>
+                <div class="r-card-sub">Risk: ${d.confidence ? (d.confidence*100).toFixed(0) : '?'}%</div>
             </div>
         </div>
         ${data.gait_cv ? `
-        <div class="card" style="margin-top:1rem;">
-            <div class="card-title">🎥 Computer Vision — Gait Analysis</div>
-            <p style="color:var(--text-sub);">Score: ${data.gait_cv.gait_score?.toFixed(1)} | ${data.gait_cv.gait_label} | Symmetry: ${(data.gait_cv.symmetry_score * 100)?.toFixed(0)}%</p>
+        <div class="w-card" style="margin-top:0.75rem;">
+            <div class="w-card-head">🎥 Computer Vision — Gait</div>
+            <p style="color:var(--text-sub);font-size:0.88rem;">
+                Locomotion Score: <strong>${data.gait_cv.locomotion_score || data.gait_cv.gait_score || 'N/A'}</strong>
+                &nbsp;|&nbsp; ${data.gait_cv.label || ''}
+                &nbsp;|&nbsp; ${data.gait_cv.description || ''}
+            </p>
         </div>` : ''}
         ${data.behavior ? `
-        <div class="card" style="margin-top:0.5rem;">
-            <div class="card-title">🧠 Behavior Analysis</div>
-            <p style="color:var(--text-sub);">${data.behavior.status || 'N/A'} | Alerts: ${data.behavior.alerts?.join(', ') || 'None'}</p>
-        </div>` : ''}
-    `;
+        <div class="w-card" style="margin-top:0.75rem;">
+            <div class="w-card-head">🧠 Behavior Analysis</div>
+            <p style="color:var(--text-sub);font-size:0.88rem;">
+                Pattern: <strong>${(data.behavior.behavior_pattern || '').replace(/_/g,' ')}</strong>
+                &nbsp;|&nbsp; Score: <strong>${data.behavior.behavior_health_score || 'N/A'}/100</strong>
+                ${data.behavior.alerts && data.behavior.alerts.length ? '<br>Alerts: ' + data.behavior.alerts.map(al => `<span style="color:var(--orange)">${al.type} (${al.severity}): ${al.message}</span>`).join(', ') : ''}
+            </p>
+        </div>` : ''}`;
 }
 
 async function uploadCsv() {
@@ -551,76 +576,63 @@ async function uploadCsv() {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-
-    document.getElementById('scanResults').innerHTML = '<div class="alert alert-green">🔄 Processing CSV...</div>';
+    document.getElementById('scanResults').innerHTML =
+        '<div class="alert alert-green" style="margin-top:1rem;">🔄 Processing CSV…</div>';
     try {
         const r = await fetch(`${API}/api/livestock/scan-csv`, { method: 'POST', body: formData });
         const data = await r.json();
-        let html = `<div class="section-label">📊 Batch Scan Results (${data.total} animals)</div><table class="data-table"><thead><tr><th>#</th><th>Animal</th><th>Health</th><th>Confidence</th><th>Disease Risk</th><th>Gait</th><th>Anomaly</th></tr></thead><tbody>`;
-        data.results.forEach(r => {
-            html += `<tr><td>${r.id}</td><td>${r.animal_id}</td><td>${r.health}</td><td>${r.confidence}</td><td>${r.disease}</td><td>${r.gait}</td><td>${r.anomaly ? '⚠️' : '✅'}</td></tr>`;
+        if (data.error) {
+            document.getElementById('scanResults').innerHTML = `<div class="alert alert-red">❌ ${data.error}</div>`;
+            return;
+        }
+        let html = `<div class="section-label" style="margin-top:1rem;">📊 Batch Scan Results (${data.total} animals)</div>
+            <table class="data-table"><thead><tr>
+                <th>#</th><th>Animal</th><th>Health</th><th>Confidence</th><th>Disease Risk</th><th>Gait</th><th>Anomaly</th>
+            </tr></thead><tbody>`;
+        data.results.forEach(row => {
+            html += `<tr><td>${row.id}</td><td>${row.animal_id}</td><td>${row.health}</td><td>${row.confidence}</td><td>${row.disease}</td><td>${row.gait}</td><td>${row.anomaly ? '⚠️' : '✅'}</td></tr>`;
         });
         html += '</tbody></table>';
         document.getElementById('scanResults').innerHTML = html;
     } catch (e) {
-        document.getElementById('scanResults').innerHTML = '<div class="alert alert-red">❌ CSV upload failed</div>';
+        document.getElementById('scanResults').innerHTML =
+            '<div class="alert alert-red">❌ CSV upload failed</div>';
     }
 }
 
 // ══════════════════════════════════════════
-// LIVESTOCK — DATA TABLES & RECORDS
+// LIVESTOCK — REFERENCE DATA & RECORDS
 // ══════════════════════════════════════════
 async function loadLivestockData() {
-    // Vaccination schedule
-    try {
-        const r = await fetch(`${API}/api/reference/vaccination`);
-        const data = await r.json();
-        document.getElementById('vaxScheduleTable').innerHTML = buildTable(data.schedule, ['disease', 'vaccine', 'when', 'route']);
-    } catch (e) { }
-
-    // Diet reference
-    try {
-        const r = await fetch(`${API}/api/reference/diet`);
-        const data = await r.json();
-        document.getElementById('dietRefTable').innerHTML = buildTable(data.diet, ['component', 'qty', 'examples']);
-    } catch (e) { }
-
-    // MRL
-    try {
-        const r = await fetch(`${API}/api/reference/mrl`);
-        const data = await r.json();
-        document.getElementById('mrlTable').innerHTML = buildTable(data.guidelines, ['chemical', 'type', 'mrl', 'phi', 'risk']);
-    } catch (e) { }
-
-    // First Aid
-    try {
-        const r = await fetch(`${API}/api/reference/first-aid`);
-        const data = await r.json();
-        document.getElementById('firstAidTable').innerHTML = buildTable(data.first_aid, ['emergency', 'action', 'time']);
-    } catch (e) { }
-
-    // Vet Resources
-    try {
-        const r = await fetch(`${API}/api/reference/vet-resources`);
-        const data = await r.json();
-        document.getElementById('vetResourcesTable').innerHTML = buildTable(data.resources, ['service', 'find', 'coverage']);
-    } catch (e) { }
-
+    const endpoints = [
+        ['/api/reference/vaccination', (d) => buildTable(d.schedule, ['disease','vaccine','when','route']), 'vaxScheduleTable'],
+        ['/api/reference/diet', (d) => buildTable(d.diet, ['component','qty','examples']), 'dietRefTable'],
+        ['/api/reference/mrl', (d) => buildTable(d.guidelines, ['chemical','type','mrl','phi','risk']), 'mrlTable'],
+        ['/api/reference/first-aid', (d) => buildTable(d.first_aid, ['emergency','action','time']), 'firstAidTable'],
+        ['/api/reference/vet-resources', (d) => buildTable(d.resources, ['service','find','coverage']), 'vetResourcesTable'],
+    ];
+    for (const [url, fn, el] of endpoints) {
+        try {
+            const r = await fetch(API + url);
+            document.getElementById(el).innerHTML = fn(await r.json());
+        } catch (e) {}
+    }
     renderVaxRecords();
     renderDietRecords();
     renderFarmInputRecords();
 }
 
 function buildTable(rows, keys) {
-    const headers = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
-    let html = '<table class="data-table"><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+    const headers = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g,' '));
+    let html = '<table class="data-table"><thead><tr>' +
+        headers.map(h => `<th>${h}</th>`).join('') +
+        '</tr></thead><tbody>';
     rows.forEach(row => {
         html += '<tr>' + keys.map(k => `<td>${row[k] || ''}</td>`).join('') + '</tr>';
     });
     return html + '</tbody></table>';
 }
 
-// ── Save Records ──
 function saveVax() {
     const rec = {
         animal: document.getElementById('vaxAnimal').value,
@@ -629,14 +641,13 @@ function saveVax() {
         dose: document.getElementById('vaxDose').value,
         date: document.getElementById('vaxDate').value,
         vet: document.getElementById('vaxVet').value,
-        notes: document.getElementById('vaxNotes').value,
-        timestamp: new Date().toISOString()
+        notes: document.getElementById('vaxNotes').value
     };
+    if (!rec.name) { alert('Please enter a vaccine/medicine name.'); return; }
     vaxRecords.push(rec);
     localStorage.setItem('vaxRecords', JSON.stringify(vaxRecords));
     renderVaxRecords();
-    // Clear form
-    ['vaxAnimal', 'vaxName', 'vaxDose', 'vaxVet', 'vaxNotes'].forEach(id => document.getElementById(id).value = '');
+    ['vaxAnimal','vaxName','vaxDose','vaxVet','vaxNotes'].forEach(id => document.getElementById(id).value = '');
 }
 
 function saveDiet() {
@@ -648,13 +659,12 @@ function saveDiet() {
         dry: document.getElementById('dietDry').value,
         concentrates: document.getElementById('dietConc').value,
         water: document.getElementById('dietWater').value,
-        notes: document.getElementById('dietNotes').value,
-        timestamp: new Date().toISOString()
+        notes: document.getElementById('dietNotes').value
     };
     dietRecords.push(rec);
     localStorage.setItem('dietRecords', JSON.stringify(dietRecords));
     renderDietRecords();
-    ['dietAnimal', 'dietNotes'].forEach(id => document.getElementById(id).value = '');
+    ['dietAnimal','dietNotes'].forEach(id => document.getElementById(id).value = '');
 }
 
 function saveFarmInput() {
@@ -665,34 +675,32 @@ function saveFarmInput() {
         field: document.getElementById('fiField').value,
         date: document.getElementById('fiDate').value,
         phi: document.getElementById('fiPhi').value,
-        notes: document.getElementById('fiNotes').value,
-        timestamp: new Date().toISOString()
+        notes: document.getElementById('fiNotes').value
     };
+    if (!rec.name) { alert('Please enter a product name.'); return; }
     farmInputRecords.push(rec);
     localStorage.setItem('farmInputRecords', JSON.stringify(farmInputRecords));
     renderFarmInputRecords();
-    ['fiName', 'fiDose', 'fiField', 'fiNotes'].forEach(id => document.getElementById(id).value = '');
+    ['fiName','fiDose','fiField','fiNotes'].forEach(id => document.getElementById(id).value = '');
 }
 
 function renderVaxRecords() {
-    if (vaxRecords.length === 0) { document.getElementById('vaxRecords').innerHTML = ''; return; }
+    if (!vaxRecords.length) { document.getElementById('vaxRecords').innerHTML = ''; return; }
     document.getElementById('vaxRecords').innerHTML =
-        '<div class="section-label">📋 Saved Records (' + vaxRecords.length + ')</div>' +
-        buildTable(vaxRecords, ['date', 'animal', 'type', 'name', 'dose', 'vet']);
+        `<div class="section-label">📋 Saved Records (${vaxRecords.length})</div>` +
+        buildTable(vaxRecords, ['date','animal','type','name','dose','vet']);
 }
-
 function renderDietRecords() {
-    if (dietRecords.length === 0) { document.getElementById('dietRecords').innerHTML = ''; return; }
+    if (!dietRecords.length) { document.getElementById('dietRecords').innerHTML = ''; return; }
     document.getElementById('dietRecords').innerHTML =
-        '<div class="section-label">📋 Diet Logs (' + dietRecords.length + ')</div>' +
-        buildTable(dietRecords, ['date', 'animal', 'lactation', 'green', 'dry', 'concentrates', 'water']);
+        `<div class="section-label">📋 Diet Logs (${dietRecords.length})</div>` +
+        buildTable(dietRecords, ['date','animal','lactation','green','dry','concentrates','water']);
 }
-
 function renderFarmInputRecords() {
-    if (farmInputRecords.length === 0) { document.getElementById('farmInputRecords').innerHTML = ''; return; }
+    if (!farmInputRecords.length) { document.getElementById('farmInputRecords').innerHTML = ''; return; }
     document.getElementById('farmInputRecords').innerHTML =
-        '<div class="section-label">📋 Application Records (' + farmInputRecords.length + ')</div>' +
-        buildTable(farmInputRecords, ['date', 'type', 'name', 'dose', 'field', 'phi']);
+        `<div class="section-label">📋 Application Records (${farmInputRecords.length})</div>` +
+        buildTable(farmInputRecords, ['date','type','name','dose','field','phi']);
 }
 
 // ── Emergency Vet ──
@@ -701,9 +709,10 @@ function findVet() {
     if (!location) { alert('Please enter your location'); return; }
     const url = `https://www.google.com/maps/search/veterinary+hospital+near+${encodeURIComponent(location)}`;
     document.getElementById('vetResults').innerHTML = `
-        <div class="card" style="margin-top:1rem;">
-            <p style="color:var(--text-sub);">Searching for <strong>veterinary services</strong> near <strong>${escapeHtml(location)}</strong></p>
-            <a href="${url}" target="_blank" class="btn btn-primary" style="margin-top:0.8rem; text-decoration:none;">🗺️ Open in Google Maps →</a>
-        </div>
-    `;
+        <div class="w-card" style="margin-top:1rem;">
+            <p style="color:var(--text-sub);font-size:0.9rem;">Searching for <strong>veterinary services</strong> near <strong>${escapeHtml(location)}</strong></p>
+            <a href="${url}" target="_blank" class="btn-primary" style="margin-top:0.8rem;display:inline-flex;text-decoration:none;">
+                🗺️ Open in Google Maps →
+            </a>
+        </div>`;
 }

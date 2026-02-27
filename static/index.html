@@ -1,441 +1,481 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description"
-        content="KrishiSakhiAI — Smart Farming Assistant with AI Chat, Livestock Biosecurity, Crop Planning & more">
-    <title>KrishiSakhiAI — Smart Farming Assistant</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KrishiSakhiAI — Smart Farming Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>">
 </head>
-
 <body>
+<div class="app">
 
-    <div class="app">
-        <!-- ═══ SIDEBAR ═══ -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-title">⚙️ Configuration Panel</div>
+  <!-- ══ ICON RAIL ══ -->
+  <nav class="icon-rail">
+    <div class="rail-brand">🌾</div>
+    <div class="rail-links">
+      <button class="rail-btn active" id="rb-chat" onclick="setMode('chat')" title="Chat Assistant">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span>Chat</span>
+      </button>
+      <button class="rail-btn" id="rb-livestock" onclick="setMode('livestock')" title="Livestock Hub">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+        <span>Livestock</span>
+      </button>
+    </div>
+    <div class="rail-foot">
+      <button class="rail-btn" onclick="clearChat()" title="Clear Chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        <span>Clear</span>
+      </button>
+    </div>
+  </nav>
 
-            <div id="statusBadges">
-                <div class="status-badge" id="ollamaStatus">🔄 Checking...</div>
-            </div>
-
-            <div id="farmerSidebar" style="display:none;"></div>
-
-            <div id="modeSelector" style="display:none;">
-                <div class="mode-tabs">
-                    <button class="mode-tab active" data-mode="chat" onclick="setMode('chat')">💬 Chat</button>
-                    <button class="mode-tab" data-mode="livestock" onclick="setMode('livestock')">🐄 Livestock</button>
-                </div>
-            </div>
-
-            <div class="form-group" id="modelSelector" style="display:none;">
-                <label class="form-label">🤖 AI Model</label>
-                <select class="form-select" id="modelSelect"></select>
-            </div>
-
-            <div class="form-group" id="langSelector" style="display:none;">
-                <label class="form-label">🌐 Language / भाषा</label>
-                <select class="form-select" id="langSelect" onchange="onLangChange()">
-                    <option value="English">🇬🇧 English</option>
-                    <option value="Hindi">🇮🇳 हिंदी (Hindi)</option>
-                    <option value="Marathi">🏳️ मराठी (Marathi)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">🎚️ Temperature: <span id="tempVal">0.70</span></label>
-                <input type="range" min="0" max="1" step="0.05" value="0.7" id="temperature" style="width:100%"
-                    oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(2)">
-            </div>
-
-            <button class="btn btn-secondary btn-full" onclick="clearChat()">🗑️ Clear Chat</button>
-            <button class="btn btn-danger btn-full" id="resetProfileBtn" style="display:none;"
-                onclick="resetProfile()">🔄 Reset Profile</button>
-
-            <div style="margin-top:auto; text-align:center; padding-top:1rem; border-top:1px solid var(--border);">
-                <span style="font-size:0.75rem; color:var(--text-dim);">KrishiSakhiAI v2.0 — FastAPI Edition</span>
-            </div>
-        </aside>
-
-        <!-- ═══ MAIN CONTENT ═══ -->
-        <main class="main">
-
-            <!-- PAGE: ONBOARDING STEP 1 — REGISTRATION -->
-            <div class="page active" id="pageRegister">
-                <div class="onboard-wrap">
-                    <div class="step-dots">
-                        <div class="step-dot active">1</div>
-                        <div class="step-dot pending">2</div>
-                        <div class="step-dot pending">3</div>
-                    </div>
-                    <div class="hero-box">
-                        <h2>🌾 Welcome to KrishiSakhiAI</h2>
-                        <p>Let's set up your farmer profile to personalize your experience</p>
-                    </div>
-                    <div class="card">
-                        <h3 style="margin-bottom:1.2rem; font-size:1.2rem;">👤 Farmer Registration</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">👨‍🌾 Full Name *</label>
-                                <input class="form-input" id="regName" placeholder="e.g. Rajesh Patil">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">💧 Primary Water Source</label>
-                                <select class="form-select" id="regWater">
-                                    <option>🏔️ Well / Borewell</option>
-                                    <option>🏞️ Canal</option>
-                                    <option>🌊 River / Stream</option>
-                                    <option>🌧️ Rainfed only</option>
-                                    <option>🏗️ Farm Pond</option>
-                                    <option>🚰 Drip / Sprinkler</option>
-                                    <option>🪣 Tank / Reservoir</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">📱 Phone Number *</label>
-                                <input class="form-input" id="regPhone" placeholder="e.g. 9876543210" maxlength="10">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">🌱 Current Crop(s)</label>
-                                <input class="form-input" id="regCrop" placeholder="e.g. Sugarcane, Onion, Wheat">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">🏞️ Land Size (Acres)</label>
-                                <input type="number" class="form-input" id="regLand" value="5" min="0.1" step="0.5">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">📍 Region (Maharashtra)</label>
-                                <select class="form-select" id="regRegion"></select>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-full" style="margin-top:1rem;"
-                            onclick="submitRegistration()">
-                            ✅ Continue to Crop Planning →
-                        </button>
-                        <div id="regError" class="alert alert-red" style="display:none;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PAGE: ONBOARDING STEP 2 — CROP PLANNING -->
-            <div class="page" id="pageCropPlan">
-                <div class="onboard-wrap">
-                    <div class="step-dots">
-                        <div class="step-dot done">✓</div>
-                        <div class="step-dot active">2</div>
-                        <div class="step-dot pending">3</div>
-                    </div>
-                    <div id="cropPlanContent"></div>
-                    <div style="display:flex; gap:1rem; margin-top:1.5rem;">
-                        <button class="btn btn-secondary" style="flex:1;" onclick="goStep(1)">← Back to
-                            Registration</button>
-                        <button class="btn btn-primary" style="flex:1;" onclick="goStep(3)">Explore Rare Crops &
-                            Diseases →</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PAGE: ONBOARDING STEP 3 — RARE CROPS -->
-            <div class="page" id="pageRareCrops">
-                <div class="onboard-wrap">
-                    <div class="step-dots">
-                        <div class="step-dot done">✓</div>
-                        <div class="step-dot done">✓</div>
-                        <div class="step-dot active">3</div>
-                    </div>
-                    <div id="rareCropContent"></div>
-                    <div style="display:flex; gap:1rem; margin-top:1.5rem;">
-                        <button class="btn btn-secondary" style="flex:1;" onclick="goStep(2)">← Back to Crop
-                            Planning</button>
-                        <button class="btn btn-primary" style="flex:1;" onclick="completeOnboarding()">✅ Enter
-                            KrishiSakhiAI →</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PAGE: CHAT -->
-            <div class="page" id="pageChat">
-                <div class="chat-container">
-                    <div class="chat-messages" id="chatMessages">
-                        <div class="welcome-box">
-                            <h2>🙏 Namaste! Welcome to KrishiSakhiAI!</h2>
-                            <p>I'm KrishiSakhi, your AI farming assistant. Ask me about crops, pests, soil health,
-                                market trends, or anything about farming!</p>
-                        </div>
-                    </div>
-                    <!-- Image Upload Area -->
-                    <div id="imageUploadArea" style="padding:0.5rem 0;">
-                        <div id="imagePreview" style="display:none; margin-bottom:0.5rem;"></div>
-                    </div>
-                    <div class="chat-input-area">
-                        <input type="file" accept="image/*" id="chatImageFile" style="display:none"
-                            onchange="previewImage(this)">
-                        <button class="btn btn-secondary" onclick="document.getElementById('chatImageFile').click()"
-                            style="padding:0.8rem; border-radius:14px; font-size:1.1rem;"
-                            title="Upload crop/livestock photo">📷</button>
-                        <input class="chat-input" id="chatInput" placeholder="Ask KrishiSakhi anything about farming..."
-                            onkeydown="if(event.key==='Enter')sendMessage()">
-                        <button class="chat-send" id="chatSendBtn" onclick="sendMessage()">🌾 Send</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PAGE: LIVESTOCK HUB -->
-            <div class="page" id="pageLivestock">
-                <div class="hero-box" style="margin-bottom:1.5rem;">
-                    <h2>🐄 Livestock Biosecurity Hub</h2>
-                    <p>AI diagnostics • Vaccination • Diet • Farm inputs • Emergency vet</p>
-                </div>
-
-                <div class="ls-tabs">
-                    <button class="ls-tab active" onclick="switchLsTab(0)">🔬 Health Scanner</button>
-                    <button class="ls-tab" onclick="switchLsTab(1)">💉 Vaccination & Medicine</button>
-                    <button class="ls-tab" onclick="switchLsTab(2)">🥬 Feed & Diet</button>
-                    <button class="ls-tab" onclick="switchLsTab(3)">🚜 Farm Inputs</button>
-                    <button class="ls-tab" onclick="switchLsTab(4)">🚑 Emergency Vet</button>
-                </div>
-
-                <!-- LS TAB 0: Health Scanner -->
-                <div class="ls-panel active" id="lsTab0">
-                    <div class="mode-tabs" style="margin-bottom:1rem;">
-                        <button class="mode-tab active" onclick="switchScanMode('manual',this)">📝 Manual Input</button>
-                        <button class="mode-tab" onclick="switchScanMode('csv',this)">📁 Upload CSV</button>
-                    </div>
-                    <div id="scanManual">
-                        <div class="result-grid">
-                            <div class="form-group"><label class="form-label">🌡️ Body Temp (°C)</label><input
-                                    type="number" class="form-input" id="s_body_temp" value="38.8" step="0.1"></div>
-                            <div class="form-group"><label class="form-label">❤️ Heart Rate (bpm)</label><input
-                                    type="number" class="form-input" id="s_heart_rate" value="60"></div>
-                            <div class="form-group"><label class="form-label">🫁 Resp. Rate (/min)</label><input
-                                    type="number" class="form-input" id="s_respiratory_rate" value="22"></div>
-                            <div class="form-group"><label class="form-label">⚡ Activity Level (%)</label><input
-                                    type="number" class="form-input" id="s_activity_level" value="68"></div>
-                            <div class="form-group"><label class="form-label">🔄 Rumination (min)</label><input
-                                    type="number" class="form-input" id="s_rumination_min" value="450"></div>
-                            <div class="form-group"><label class="form-label">🍽️ Feed Intake (kg)</label><input
-                                    type="number" class="form-input" id="s_feed_intake" value="22" step="0.5"></div>
-                            <div class="form-group"><label class="form-label">💧 Water Intake (L)</label><input
-                                    type="number" class="form-input" id="s_water_intake" value="55" step="1"></div>
-                            <div class="form-group"><label class="form-label">🥛 Milk Yield (L)</label><input
-                                    type="number" class="form-input" id="s_milk_yield" value="20" step="0.5"></div>
-                            <div class="form-group"><label class="form-label">🛌 Lying Time (hrs)</label><input
-                                    type="number" class="form-input" id="s_lying_time" value="12" step="0.5"></div>
-                            <div class="form-group"><label class="form-label">👣 Steps Count</label><input type="number"
-                                    class="form-input" id="s_steps_count" value="3500"></div>
-                            <div class="form-group"><label class="form-label">🦶 Gait Score</label><input type="number"
-                                    class="form-input" id="s_gait_score" value="1.2" step="0.1"></div>
-                            <div class="form-group"><label class="form-label">⚖️ Stance Symmetry</label><input
-                                    type="number" class="form-input" id="s_stance_symmetry" value="0.95" step="0.01">
-                            </div>
-                            <div class="form-group"><label class="form-label">📏 Stride Length (m)</label><input
-                                    type="number" class="form-input" id="s_stride_length" value="1.5" step="0.1"></div>
-                            <div class="form-group"><label class="form-label">🌡️ Ambient Temp (°C)</label><input
-                                    type="number" class="form-input" id="s_ambient_temp" value="30" step="0.5"></div>
-                            <div class="form-group"><label class="form-label">💨 Humidity (%)</label><input
-                                    type="number" class="form-input" id="s_humidity_pct" value="65"></div>
-                        </div>
-                        <button class="btn btn-primary btn-full" style="margin-top:1rem;" onclick="runScan()">🔬 Run
-                            Biosecurity Scan</button>
-                    </div>
-                    <div id="scanCsv" style="display:none;">
-                        <div class="card" style="text-align:center; padding:2rem;">
-                            <p style="color:var(--text-dim); margin-bottom:1rem;">📁 Upload a CSV file with sensor
-                                readings</p>
-                            <input type="file" accept=".csv" id="csvFile" style="display:none" onchange="uploadCsv()">
-                            <button class="btn btn-primary" onclick="document.getElementById('csvFile').click()">📤
-                                Choose CSV File</button>
-                        </div>
-                    </div>
-                    <div id="scanResults"></div>
-                </div>
-
-                <!-- LS TAB 1: Vaccination -->
-                <div class="ls-panel" id="lsTab1">
-                    <div class="card">
-                        <h3 style="color:var(--green); margin-bottom:1rem;">💉 Log Vaccination / Medicine</h3>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">🐄 Animal ID</label><input
-                                    class="form-input" id="vaxAnimal" placeholder="e.g. COW-001"></div>
-                            <div class="form-group"><label class="form-label">Type</label><select class="form-select"
-                                    id="vaxType">
-                                    <option>Vaccination</option>
-                                    <option>Deworming</option>
-                                    <option>Medicine</option>
-                                    <option>Supplement</option>
-                                </select></div>
-                            <div class="form-group"><label class="form-label">Vaccine/Medicine</label><input
-                                    class="form-input" id="vaxName" placeholder="e.g. FMD Vaccine"></div>
-                        </div>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">Dosage</label><input class="form-input"
-                                    id="vaxDose" placeholder="e.g. 5ml"></div>
-                            <div class="form-group"><label class="form-label">Date</label><input type="date"
-                                    class="form-input" id="vaxDate"></div>
-                            <div class="form-group"><label class="form-label">Veterinarian</label><input
-                                    class="form-input" id="vaxVet" placeholder="Dr. Name"></div>
-                        </div>
-                        <div class="form-group"><label class="form-label">📝 Notes</label><textarea
-                                class="form-textarea" id="vaxNotes" placeholder="Any special notes..."></textarea></div>
-                        <button class="btn btn-primary btn-full" onclick="saveVax()">💾 Save Record</button>
-                    </div>
-                    <div class="section-label" style="margin-top:2rem;">📋 Indian Vaccination Schedule</div>
-                    <div id="vaxScheduleTable"></div>
-                    <div id="vaxRecords" style="margin-top:1.5rem;"></div>
-                </div>
-
-                <!-- LS TAB 2: Feed & Diet -->
-                <div class="ls-panel" id="lsTab2">
-                    <div class="card">
-                        <h3 style="color:var(--green); margin-bottom:1rem;">🥬 Log Daily Diet</h3>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">🐄 Animal ID / Group</label><input
-                                    class="form-input" id="dietAnimal" placeholder="e.g. COW-001 or Herd A"></div>
-                            <div class="form-group"><label class="form-label">Date</label><input type="date"
-                                    class="form-input" id="dietDate"></div>
-                            <div class="form-group"><label class="form-label">Lactation Stage</label><select
-                                    class="form-select" id="dietLact">
-                                    <option>Early (0-100 days)</option>
-                                    <option>Mid (100-200 days)</option>
-                                    <option>Late (200-305 days)</option>
-                                    <option>Dry Period</option>
-                                    <option>Pregnant</option>
-                                </select></div>
-                        </div>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">🌿 Green Fodder (kg)</label><input
-                                    type="number" class="form-input" id="dietGreen" value="30"></div>
-                            <div class="form-group"><label class="form-label">🌾 Dry Fodder (kg)</label><input
-                                    type="number" class="form-input" id="dietDry" value="6"></div>
-                            <div class="form-group"><label class="form-label">🌽 Concentrates (kg)</label><input
-                                    type="number" class="form-input" id="dietConc" value="3"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label class="form-label">💧 Water (L)</label><input type="number"
-                                    class="form-input" id="dietWater" value="60"></div>
-                            <div class="form-group"><label class="form-label">📝 Special Notes</label><input
-                                    class="form-input" id="dietNotes" placeholder="e.g. Added mineral mix"></div>
-                        </div>
-                        <button class="btn btn-primary btn-full" onclick="saveDiet()">💾 Save Diet Log</button>
-                    </div>
-                    <div class="section-label" style="margin-top:2rem;">📊 Recommended Daily Diet (Dairy Cow
-                        ~15-20L/day)</div>
-                    <div id="dietRefTable"></div>
-                    <div id="dietRecords" style="margin-top:1.5rem;"></div>
-                </div>
-
-                <!-- LS TAB 3: Farm Inputs -->
-                <div class="ls-panel" id="lsTab3">
-                    <div class="card" style="margin-bottom:1rem;">
-                        <h3 style="color:var(--green); margin-bottom:1rem;">🚜 Irrigation Setup</h3>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">💧 Irrigation Type</label><select
-                                    class="form-select" id="irrType">
-                                    <option>Drip</option>
-                                    <option>Sprinkler</option>
-                                    <option>Flood/Surface</option>
-                                    <option>Furrow</option>
-                                    <option>Rainfed</option>
-                                </select></div>
-                            <div class="form-group"><label class="form-label">🔗 Water Source</label><input
-                                    class="form-input" id="irrSource" placeholder="e.g. Borewell"></div>
-                            <div class="form-group"><label class="form-label">📅 Frequency</label><select
-                                    class="form-select" id="irrFreq">
-                                    <option>Daily</option>
-                                    <option>Alternate days</option>
-                                    <option>Weekly</option>
-                                    <option>Bi-weekly</option>
-                                    <option>As needed</option>
-                                </select></div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <h3 style="color:var(--green); margin-bottom:1rem;">🧪 Log Pesticide / Fertilizer Application
-                        </h3>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">Type</label><select class="form-select"
-                                    id="fiType">
-                                    <option>Pesticide</option>
-                                    <option>Fertilizer</option>
-                                    <option>Herbicide</option>
-                                    <option>Bio-pesticide</option>
-                                    <option>Micro-nutrient</option>
-                                </select></div>
-                            <div class="form-group"><label class="form-label">Product Name</label><input
-                                    class="form-input" id="fiName" placeholder="e.g. Imidacloprid 17.8SL"></div>
-                            <div class="form-group"><label class="form-label">Dosage</label><input class="form-input"
-                                    id="fiDose" placeholder="e.g. 0.5ml/L"></div>
-                        </div>
-                        <div class="form-row-3">
-                            <div class="form-group"><label class="form-label">Field/Area</label><input
-                                    class="form-input" id="fiField" placeholder="e.g. Plot A"></div>
-                            <div class="form-group"><label class="form-label">Date</label><input type="date"
-                                    class="form-input" id="fiDate"></div>
-                            <div class="form-group"><label class="form-label">PHI (days)</label><input type="number"
-                                    class="form-input" id="fiPhi" value="14"></div>
-                        </div>
-                        <div class="form-group"><label class="form-label">⚠️ Safety Notes</label><textarea
-                                class="form-textarea" id="fiNotes"
-                                placeholder="PPE used, re-entry interval..."></textarea></div>
-                        <button class="btn btn-primary btn-full" onclick="saveFarmInput()">💾 Save Record</button>
-                    </div>
-                    <div class="section-label" style="margin-top:2rem;">📋 MRL Guidelines (Maximum Residue Limits)</div>
-                    <div id="mrlTable"></div>
-                    <div id="farmInputRecords" style="margin-top:1.5rem;"></div>
-                </div>
-
-                <!-- LS TAB 4: Emergency Vet -->
-                <div class="ls-panel" id="lsTab4">
-                    <div class="card" style="margin-bottom:1rem;">
-                        <div style="display:flex; gap:1rem; align-items:center;">
-                            <div style="font-size:2.5rem;">🚨</div>
-                            <div>
-                                <h3 style="color:var(--red); margin-bottom:0.3rem;">Emergency Helplines</h3>
-                                <p style="color:var(--text-sub); font-size:1.3rem; font-weight:700;">📞 1962 — National
-                                    Animal Helpline</p>
-                                <p style="color:var(--text-dim); font-size:0.9rem;">📞 1800-121-3456 — NDDB (Dairy)</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card" style="margin-bottom:1rem;">
-                        <h3 style="color:var(--green); margin-bottom:1rem;">🗺️ Find Nearest Vet</h3>
-                        <div class="form-row">
-                            <div class="form-group"><label class="form-label">📍 Your Location / Village /
-                                    Pincode</label><input class="form-input" id="vetLocation"
-                                    placeholder="e.g. Nashik, Maharashtra"></div>
-                            <div class="form-group" style="display:flex; align-items:flex-end;"><button
-                                    class="btn btn-primary btn-full" onclick="findVet()">🔍 Search Nearby Vets</button>
-                            </div>
-                        </div>
-                        <div id="vetResults"></div>
-                    </div>
-                    <div class="section-label">🩺 First Aid Quick Guide</div>
-                    <div id="firstAidTable"></div>
-                    <div class="section-label" style="margin-top:1.5rem;">📚 Key Veterinary Resources</div>
-                    <div id="vetResourcesTable"></div>
-                </div>
-
-                <!-- Livestock Footer -->
-                <div
-                    style="text-align:center; padding:2rem; color:var(--text-dim); margin-top:2rem; border-top:1px solid var(--border);">
-                    <p><strong>KrishiSakhiAI</strong> — Livestock Biosecurity Hub</p>
-                    <p style="font-size:0.85rem;">Health Scanner • Vaccination • Diet • Farm Inputs • Emergency Vet |
-                        Built with ❤️ for Farmers</p>
-                </div>
-            </div>
-
-        </main>
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-header">
+      <div class="sb-title">KrishiSakhiAI</div>
+      <div class="sb-ver">v2.0</div>
     </div>
 
-    <script src="/static/app.js"></script>
-</body>
+    <div id="statusBadges">
+      <div class="status-badge" id="ollamaStatus"><span class="dot dot-idle"></span>Checking…</div>
+    </div>
 
+    <div id="farmerSidebar" style="display:none;"></div>
+
+    <div id="modeSelector" style="display:none;">
+      <div class="sb-label">Mode</div>
+      <div class="seg-group">
+        <button class="seg-btn active" data-mode="chat" onclick="setMode('chat')">💬 Chat</button>
+        <button class="seg-btn" data-mode="livestock" onclick="setMode('livestock')">🐄 Livestock</button>
+      </div>
+    </div>
+
+    <div id="modelSelector" style="display:none;">
+      <div class="sb-label">AI Model</div>
+      <select class="sb-select" id="modelSelect"></select>
+    </div>
+
+    <div id="langSelector" style="display:none;">
+      <div class="sb-label">Language / भाषा</div>
+      <select class="sb-select" id="langSelect" onchange="onLangChange()">
+        <option value="English">🇬🇧 English</option>
+        <option value="Hindi">🇮🇳 हिंदी (Hindi)</option>
+        <option value="Marathi">मराठी (Marathi)</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="sb-label">Creativity &nbsp;<span class="temp-chip" id="tempVal">0.70</span></div>
+      <div class="slider-extremes"><span>Precise</span><span>Creative</span></div>
+      <input type="range" class="sb-range" min="0" max="1" step="0.05" value="0.7" id="temperature"
+        oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(2)">
+    </div>
+
+    <div style="flex:1;"></div>
+    <button class="sb-btn-danger" id="resetProfileBtn" style="display:none;" onclick="resetProfile()">↺ Reset Profile</button>
+    <div class="sb-footer">FastAPI Edition</div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <main class="main" id="mainArea">
+
+    <!-- PAGE: REGISTER -->
+    <div class="page active" id="pageRegister">
+      <div class="ob-shell">
+        <div class="ob-progress">
+          <div class="ob-step active"><div class="ob-dot">1</div><span>Profile</span></div>
+          <div class="ob-line"></div>
+          <div class="ob-step"><div class="ob-dot">2</div><span>Crops</span></div>
+          <div class="ob-line"></div>
+          <div class="ob-step"><div class="ob-dot">3</div><span>Diseases</span></div>
+        </div>
+
+        <div class="ob-hero">
+          <div class="ob-tag">🌾 Smart Farming Platform</div>
+          <h1>Welcome to KrishiSakhiAI</h1>
+          <p>AI-powered farming companion for Maharashtra. Get personalized advice on crops, pests, livestock & markets.</p>
+        </div>
+
+        <div class="w-card">
+          <div class="w-card-head">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Farmer Registration
+          </div>
+          <div class="form-grid-2">
+            <div class="fg"><label>Full Name <span class="req">*</span></label><input class="fi" id="regName" placeholder="e.g. Rajesh Patil"></div>
+            <div class="fg"><label>Phone Number <span class="req">*</span></label><input class="fi" id="regPhone" placeholder="10-digit mobile" maxlength="10"></div>
+            <div class="fg"><label>Land Size (Acres)</label><input type="number" class="fi" id="regLand" value="5" min="0.1" step="0.5"></div>
+            <div class="fg"><label>Region (Maharashtra)</label><select class="fi" id="regRegion"></select></div>
+            <div class="fg"><label>Primary Water Source</label>
+              <select class="fi" id="regWater">
+                <option>🏔️ Well / Borewell</option><option>🏞️ Canal</option>
+                <option>🌊 River / Stream</option><option>🌧️ Rainfed only</option>
+                <option>🏗️ Farm Pond</option><option>🚰 Drip / Sprinkler</option>
+              </select>
+            </div>
+            <div class="fg"><label>Current Crop(s)</label><input class="fi" id="regCrop" placeholder="e.g. Sugarcane, Onion, Wheat"></div>
+          </div>
+          <div id="regError" class="alert alert-red" style="display:none;"></div>
+          <button class="btn-primary w-full" style="margin-top:1.5rem;" onclick="submitRegistration()">
+            Continue to Crop Planning →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: CROP PLAN -->
+    <div class="page" id="pageCropPlan">
+      <div class="ob-shell">
+        <div class="ob-progress">
+          <div class="ob-step done"><div class="ob-dot">✓</div><span>Profile</span></div>
+          <div class="ob-line filled"></div>
+          <div class="ob-step active"><div class="ob-dot">2</div><span>Crops</span></div>
+          <div class="ob-line"></div>
+          <div class="ob-step"><div class="ob-dot">3</div><span>Diseases</span></div>
+        </div>
+        <div id="cropPlanContent"></div>
+        <div class="ob-nav">
+          <button class="btn-outline" onclick="goStep(1)">← Back</button>
+          <button class="btn-primary" onclick="goStep(3)">Explore Rare Crops →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: RARE CROPS -->
+    <div class="page" id="pageRareCrops">
+      <div class="ob-shell">
+        <div class="ob-progress">
+          <div class="ob-step done"><div class="ob-dot">✓</div><span>Profile</span></div>
+          <div class="ob-line filled"></div>
+          <div class="ob-step done"><div class="ob-dot">✓</div><span>Crops</span></div>
+          <div class="ob-line filled"></div>
+          <div class="ob-step active"><div class="ob-dot">3</div><span>Diseases</span></div>
+        </div>
+        <div id="rareCropContent"></div>
+        <div class="ob-nav">
+          <button class="btn-outline" onclick="goStep(2)">← Back</button>
+          <button class="btn-primary" onclick="completeOnboarding()">✅ Enter KrishiSakhiAI →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: CHAT -->
+    <div class="page" id="pageChat">
+      <div class="page-topbar">
+        <div class="topbar-left">
+          <span class="topbar-icon">🌾</span>
+          <div>
+            <div class="topbar-name">KrishiSakhi</div>
+            <div class="topbar-sub">AI Agricultural Assistant</div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="pill-tabs">
+            <button class="pill-tab active" data-mode="chat" onclick="setMode('chat')">💬 Chat</button>
+            <button class="pill-tab" data-mode="livestock" onclick="setMode('livestock')">🐄 Livestock</button>
+          </div>
+          <label class="kb-toggle">
+            <input type="checkbox" id="kbToggle" checked>
+            <span class="kb-track"><span class="kb-thumb"></span></span>
+            <span class="kb-label">Knowledge Base</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="chat-layout">
+        <div class="chat-main">
+          <div class="chat-messages" id="chatMessages">
+            <div class="welcome-box">
+              <div class="welcome-badge">🙏 Namaste!</div>
+              <h2>Welcome to KrishiSakhiAI</h2>
+              <p>Your AI-powered farming companion. Ask me about crops, pests, soil health, livestock, or market prices!</p>
+              <div class="chip-row">
+                <button class="chip" onclick="useChip(this)">🌱 Best kharif crops for my region?</button>
+                <button class="chip" onclick="useChip(this)">🐛 How to control aphids organically?</button>
+                <button class="chip" onclick="useChip(this)">💧 Drip irrigation setup guide</button>
+                <button class="chip" onclick="useChip(this)">📈 Current MSP rates for wheat?</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="imageUploadArea" style="padding:0 1.5rem 0;">
+            <div id="imagePreview" style="display:none; margin-bottom:0.5rem;"></div>
+          </div>
+
+          <div class="chat-bar">
+            <input type="file" accept="image/*" id="chatImageFile" style="display:none" onchange="previewImage(this)">
+            <button class="bar-icon-btn" onclick="document.getElementById('chatImageFile').click()" title="Upload image">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <input class="chat-input" id="chatInput" placeholder="Ask about crops, pests, soil, livestock…"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}">
+            <button class="btn-send" id="chatSendBtn" onclick="sendMessage()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Send
+            </button>
+          </div>
+        </div>
+
+        <!-- Right summary panel -->
+        <div class="summary-panel">
+          <div class="sp-section">
+            <div class="sp-title">Farm Overview</div>
+            <div class="sp-card">
+              <div class="sp-label">Current Season</div>
+              <div class="sp-value" id="cspSeasonVal">—</div>
+            </div>
+            <div class="sp-card">
+              <div class="sp-label">Your Region</div>
+              <div class="sp-value" id="cspRegionVal">—</div>
+            </div>
+            <div class="sp-card">
+              <div class="sp-label">AI Status</div>
+              <div class="sp-value" id="cspAiStatus" style="color:#f59e0b;">Connecting…</div>
+            </div>
+          </div>
+          <div class="sp-divider"></div>
+          <div class="sp-section">
+            <div class="sp-title">Farming Tips</div>
+            <div class="tip-item">🌧️ Check soil moisture before irrigation</div>
+            <div class="tip-item">🐛 Scout fields every 7 days for pests</div>
+            <div class="tip-item">🌡️ Monitor THI for heat stress in cattle</div>
+            <div class="tip-item">💊 Keep vaccination records updated</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: LIVESTOCK -->
+    <div class="page" id="pageLivestock">
+      <div class="page-topbar">
+        <div class="topbar-left">
+          <span class="topbar-icon">🐄</span>
+          <div>
+            <div class="topbar-name">Livestock Biosecurity Hub</div>
+            <div class="topbar-sub">AI diagnostics · Vaccination · Diet · Inputs · Emergency</div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="pill-tabs">
+            <button class="pill-tab" data-mode="chat" onclick="setMode('chat')">💬 Chat</button>
+            <button class="pill-tab active" data-mode="livestock" onclick="setMode('livestock')">🐄 Livestock</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ls-tabbar">
+        <button class="ls-tab active" onclick="switchLsTab(0)">🔬 Health Scanner</button>
+        <button class="ls-tab" onclick="switchLsTab(1)">💉 Vaccination</button>
+        <button class="ls-tab" onclick="switchLsTab(2)">🥬 Feed & Diet</button>
+        <button class="ls-tab" onclick="switchLsTab(3)">🚜 Farm Inputs</button>
+        <button class="ls-tab" onclick="switchLsTab(4)">🚑 Emergency Vet</button>
+      </div>
+
+      <div class="ls-body">
+
+        <!-- TAB 0 -->
+        <div class="ls-panel active" id="lsTab0">
+          <div class="scan-toggle-bar">
+            <button class="mode-tab active" onclick="switchScanMode('manual',this)">📝 Manual Input</button>
+            <button class="mode-tab" onclick="switchScanMode('csv',this)">📁 Upload CSV</button>
+          </div>
+
+          <div id="scanManual">
+            <div class="sensor-block">
+              <div class="sensor-block-title">🌡️ Physiological Sensors</div>
+              <div class="sensor-grid-5">
+                <div class="fg"><label>Body Temp °C <span class="nr">38.3–39.4</span></label><input type="number" class="fi" id="s_body_temp" value="38.8" step="0.1"></div>
+                <div class="fg"><label>Heart Rate bpm <span class="nr">40–80</span></label><input type="number" class="fi" id="s_heart_rate" value="60"></div>
+                <div class="fg"><label>Resp. Rate /min <span class="nr">15–30</span></label><input type="number" class="fi" id="s_respiratory_rate" value="22"></div>
+                <div class="fg"><label>Activity % <span class="nr">50–85</span></label><input type="number" class="fi" id="s_activity_level" value="68"></div>
+                <div class="fg"><label>Milk Yield L/day <span class="nr">12–30</span></label><input type="number" class="fi" id="s_milk_yield" value="20" step="0.5"></div>
+              </div>
+            </div>
+            <div class="sensor-block">
+              <div class="sensor-block-title">🔄 Activity & Intake</div>
+              <div class="sensor-grid-5">
+                <div class="fg"><label>Rumination min <span class="nr">380–520</span></label><input type="number" class="fi" id="s_rumination_min" value="450"></div>
+                <div class="fg"><label>Feed Intake kg <span class="nr">18–28</span></label><input type="number" class="fi" id="s_feed_intake" value="22" step="0.5"></div>
+                <div class="fg"><label>Water Intake L <span class="nr">40–80</span></label><input type="number" class="fi" id="s_water_intake" value="55"></div>
+                <div class="fg"><label>Lying Time hrs <span class="nr">10–14</span></label><input type="number" class="fi" id="s_lying_time" value="12" step="0.5"></div>
+                <div class="fg"><label>Steps /day <span class="nr">2000–5000</span></label><input type="number" class="fi" id="s_steps_count" value="3500"></div>
+              </div>
+            </div>
+            <div class="sensor-block">
+              <div class="sensor-block-title">🦿 Gait & Environment</div>
+              <div class="sensor-grid-5">
+                <div class="fg"><label>Gait Score 1–5 <span class="nr">1=Normal</span></label><input type="number" class="fi" id="s_gait_score" value="1.2" step="0.1"></div>
+                <div class="fg"><label>Stance Symmetry <span class="nr">1.0=perfect</span></label><input type="number" class="fi" id="s_stance_symmetry" value="0.95" step="0.01"></div>
+                <div class="fg"><label>Stride Length m <span class="nr">1.4–1.7</span></label><input type="number" class="fi" id="s_stride_length" value="1.5" step="0.05"></div>
+                <div class="fg"><label>Ambient Temp °C</label><input type="number" class="fi" id="s_ambient_temp" value="30" step="0.5"></div>
+                <div class="fg"><label>Humidity %</label><input type="number" class="fi" id="s_humidity_pct" value="65"></div>
+              </div>
+            </div>
+            <button class="btn-primary w-full" style="padding:0.9rem;font-size:1rem;margin-top:0.5rem;" onclick="runScan()">🔬 Run Biosecurity Scan</button>
+          </div>
+
+          <div id="scanCsv" style="display:none;">
+            <div class="upload-box">
+              <div class="upload-icon">📁</div>
+              <p>Upload a CSV with sensor readings</p>
+              <small>Required columns: body_temp, heart_rate, respiratory_rate, activity_level, rumination_min, feed_intake, water_intake, milk_yield, lying_time, steps_count, gait_score, stance_symmetry, stride_length, ambient_temp, humidity_pct</small>
+              <input type="file" accept=".csv" id="csvFile" style="display:none" onchange="uploadCsv()">
+              <button class="btn-primary" style="margin-top:1rem;" onclick="document.getElementById('csvFile').click()">📤 Choose CSV File</button>
+            </div>
+          </div>
+          <div id="scanResults"></div>
+        </div>
+
+        <!-- TAB 1 -->
+        <div class="ls-panel" id="lsTab1">
+          <div class="w-card">
+            <div class="w-card-head">💉 Log Vaccination / Medicine</div>
+            <div class="form-grid-3">
+              <div class="fg"><label>Animal ID</label><input class="fi" id="vaxAnimal" placeholder="e.g. COW-001"></div>
+              <div class="fg"><label>Record Type</label><select class="fi" id="vaxType"><option>Vaccination</option><option>Deworming</option><option>Medicine</option><option>Supplement</option></select></div>
+              <div class="fg"><label>Vaccine / Medicine</label><input class="fi" id="vaxName" placeholder="e.g. FMD Vaccine"></div>
+              <div class="fg"><label>Dosage</label><input class="fi" id="vaxDose" placeholder="e.g. 5ml IM"></div>
+              <div class="fg"><label>Date Administered</label><input type="date" class="fi" id="vaxDate"></div>
+              <div class="fg"><label>Veterinarian</label><input class="fi" id="vaxVet" placeholder="Dr. Name"></div>
+            </div>
+            <div class="fg"><label>Notes</label><textarea class="fi ft" id="vaxNotes" placeholder="Batch number, reactions, withdrawal period…"></textarea></div>
+            <button class="btn-primary" style="margin-top:1rem;" onclick="saveVax()">💾 Save Record</button>
+          </div>
+          <div class="section-label">📋 Indian Vaccination Schedule</div>
+          <div id="vaxScheduleTable"></div>
+          <div id="vaxRecords" style="margin-top:1.5rem;"></div>
+        </div>
+
+        <!-- TAB 2 -->
+        <div class="ls-panel" id="lsTab2">
+          <div class="w-card">
+            <div class="w-card-head">🥬 Log Daily Diet</div>
+            <div class="form-grid-3">
+              <div class="fg"><label>Animal / Group</label><input class="fi" id="dietAnimal" placeholder="e.g. COW-001 or Herd A"></div>
+              <div class="fg"><label>Date</label><input type="date" class="fi" id="dietDate"></div>
+              <div class="fg"><label>Lactation Stage</label><select class="fi" id="dietLact"><option>Early (0-100 days)</option><option>Mid (100-200 days)</option><option>Late (200-305 days)</option><option>Dry Period</option></select></div>
+              <div class="fg"><label>🌿 Green Fodder kg</label><input type="number" class="fi" id="dietGreen" value="30"></div>
+              <div class="fg"><label>🌾 Dry Fodder kg</label><input type="number" class="fi" id="dietDry" value="6"></div>
+              <div class="fg"><label>🌽 Concentrates kg</label><input type="number" class="fi" id="dietConc" value="3"></div>
+              <div class="fg"><label>💧 Water L</label><input type="number" class="fi" id="dietWater" value="60"></div>
+              <div class="fg"><label>Notes</label><input class="fi" id="dietNotes" placeholder="e.g. Added mineral mix"></div>
+            </div>
+            <button class="btn-primary" style="margin-top:1rem;" onclick="saveDiet()">💾 Save Diet Log</button>
+          </div>
+          <div class="section-label">📊 Recommended Daily Diet — Dairy Cow</div>
+          <div id="dietRefTable"></div>
+          <div id="dietRecords" style="margin-top:1.5rem;"></div>
+        </div>
+
+        <!-- TAB 3 -->
+        <div class="ls-panel" id="lsTab3">
+          <div class="w-card" style="margin-bottom:1rem;">
+            <div class="w-card-head">🚜 Irrigation Setup</div>
+            <div class="form-grid-3">
+              <div class="fg"><label>Irrigation Type</label><select class="fi" id="irrType"><option>Drip</option><option>Sprinkler</option><option>Flood/Surface</option><option>Furrow</option><option>Rainfed</option></select></div>
+              <div class="fg"><label>Water Source</label><input class="fi" id="irrSource" placeholder="e.g. Borewell"></div>
+              <div class="fg"><label>Frequency</label><select class="fi" id="irrFreq"><option>Daily</option><option>Alternate days</option><option>Weekly</option><option>As needed</option></select></div>
+            </div>
+          </div>
+          <div class="w-card">
+            <div class="w-card-head">🧪 Log Pesticide / Fertilizer</div>
+            <div class="form-grid-3">
+              <div class="fg"><label>Type</label><select class="fi" id="fiType"><option>Pesticide</option><option>Fertilizer</option><option>Herbicide</option><option>Bio-pesticide</option></select></div>
+              <div class="fg"><label>Product Name</label><input class="fi" id="fiName" placeholder="e.g. Imidacloprid 17.8SL"></div>
+              <div class="fg"><label>Dosage</label><input class="fi" id="fiDose" placeholder="e.g. 0.5ml/L"></div>
+              <div class="fg"><label>Field / Plot</label><input class="fi" id="fiField" placeholder="e.g. Plot A"></div>
+              <div class="fg"><label>Date Applied</label><input type="date" class="fi" id="fiDate"></div>
+              <div class="fg"><label>PHI (days)</label><input type="number" class="fi" id="fiPhi" value="14"></div>
+            </div>
+            <div class="fg"><label>Safety Notes</label><textarea class="fi ft" id="fiNotes" placeholder="PPE used, re-entry interval…"></textarea></div>
+            <button class="btn-primary" style="margin-top:1rem;" onclick="saveFarmInput()">💾 Save Record</button>
+          </div>
+          <div class="section-label">⚠️ MRL Guidelines</div>
+          <div id="mrlTable"></div>
+          <div id="farmInputRecords" style="margin-top:1.5rem;"></div>
+        </div>
+
+        <!-- TAB 4 -->
+        <div class="ls-panel" id="lsTab4">
+          <div class="emergency-card">
+            <div class="em-icon">🚨</div>
+            <div>
+              <div class="em-title">Emergency Helplines</div>
+              <div class="em-num">📞 1962 — National Animal Helpline</div>
+              <div class="em-sub">📞 1800-121-3456 — NDDB Dairy (Toll-free)</div>
+            </div>
+          </div>
+          <div class="w-card" style="margin-bottom:1rem;">
+            <div class="w-card-head">🗺️ Find Nearest Vet</div>
+            <div class="form-grid-2">
+              <div class="fg"><label>Your Location / Village / Pincode</label><input class="fi" id="vetLocation" placeholder="e.g. Nashik, Maharashtra"></div>
+              <div class="fg" style="display:flex;align-items:flex-end;"><button class="btn-primary w-full" onclick="findVet()">🔍 Search Nearby Vets</button></div>
+            </div>
+            <div id="vetResults"></div>
+          </div>
+          <div class="section-label">🩺 First Aid Quick Guide</div>
+          <div id="firstAidTable"></div>
+          <div class="section-label" style="margin-top:1.5rem;">📚 Veterinary Resources</div>
+          <div id="vetResourcesTable"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+  function useChip(el) {
+    document.getElementById('chatInput').value = el.textContent.trim();
+    document.getElementById('chatInput').focus();
+  }
+  // Patch completeOnboarding to update summary panel
+  const _oc = window.completeOnboarding;
+  window.completeOnboarding = function() {
+    _oc && _oc();
+    const fp = JSON.parse(localStorage.getItem('farmerProfile') || 'null');
+    if (fp) {
+      const rv = document.getElementById('cspRegionVal');
+      if (rv) rv.textContent = fp.region || '—';
+    }
+    const month = new Date().getMonth();
+    const seasons = ['Rabi','Rabi','Rabi','Summer','Summer','Kharif','Kharif','Kharif','Kharif','Rabi','Rabi','Rabi'];
+    const sv = document.getElementById('cspSeasonVal');
+    if (sv) sv.textContent = seasons[month] + ' Season';
+    // Sync icon rail
+    syncRail('chat');
+  };
+  function syncRail(mode) {
+    document.querySelectorAll('.rail-btn').forEach(b => b.classList.remove('active'));
+    const rb = document.getElementById('rb-' + mode);
+    if (rb) rb.classList.add('active');
+    document.querySelectorAll('.pill-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  }
+  // Patch setMode to sync rail
+  const _sm = window.setMode;
+  window.setMode = function(mode) {
+    _sm && _sm(mode);
+    syncRail(mode);
+  };
+  // Update AI status
+  const _ch = window.checkHealth;
+  window.checkHealth = async function() {
+    await _ch && _ch();
+    setTimeout(() => {
+      const badge = document.getElementById('ollamaStatus');
+      const ok = badge && badge.className.includes('ok');
+      const csp = document.getElementById('cspAiStatus');
+      if (csp) {
+        csp.textContent = ok ? 'Online ✓' : 'Offline';
+        csp.style.color = ok ? '#10b981' : '#ef4444';
+      }
+    }, 800);
+  };
+</script>
+</body>
 </html>
