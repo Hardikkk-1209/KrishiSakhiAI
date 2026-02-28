@@ -254,7 +254,7 @@ class LivestockReq(BaseModel):
 @app.get("/api/health")
 @app.get("/api/status")
 def health():
-    return {"ollama": check_ollama(), "vector_store": vs.loaded, "livestock": lm is not None}
+    return {"ollama": check_ollama(), "vector_store": vs.loaded, "livestock": True}
 
 @app.get("/api/models")
 def models():

@@ -230,6 +230,9 @@ function completeOnboarding() {
         // Update summary panel
         const rv = document.getElementById('cspRegionVal');
         if (rv) rv.textContent = farmerProfile.region || '—';
+        if (farmerProfile && farmerProfile.region) {
+        loadWeatherMini(farmerProfile.region);
+}
     }
 
     const month = new Date().getMonth();
@@ -715,4 +718,46 @@ function findVet() {
                 🗺️ Open in Google Maps →
             </a>
         </div>`;
+}
+// ══════════════════════════════════════════
+// WEATHER MINI PANEL
+// ══════════════════════════════════════════
+async function loadWeatherMini(region) {
+    try {
+        const r = await fetch(`${API}/api/weather/${region}`);
+        const data = await r.json();
+
+        if (!data.forecast || !data.forecast.length) return;
+
+        const today = data.forecast[0];
+
+        const tempEl = document.getElementById("weatherMiniTemp");
+        const descEl = document.getElementById("weatherMiniDesc");
+        const humEl = document.getElementById("weatherMiniHumidity");
+        const windEl = document.getElementById("weatherMiniWind");
+        const adviceEl = document.getElementById("weatherMiniAdvice");
+
+        if (!tempEl) return; // safety check if UI not loaded
+
+        tempEl.innerText = today.temperature + "°C";
+        descEl.innerText = today.weather;
+        humEl.innerText = today.humidity + "%";
+        windEl.innerText = today.wind_speed + " m/s";
+
+        let advice = "Conditions normal for farming.";
+
+        if (today.temperature > 38)
+            advice = "⚠ High heat — Irrigate early morning.";
+
+        if (today.wind_speed > 6)
+            advice = "⚠ Strong winds — Avoid pesticide spray.";
+
+        if (today.humidity > 80)
+            advice = "⚠ High humidity — Fungal disease risk.";
+
+        adviceEl.innerText = advice;
+
+    } catch (err) {
+        console.log("Weather load error:", err);
+    }
 }

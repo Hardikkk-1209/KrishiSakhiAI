@@ -622,6 +622,48 @@ input, select, textarea { font-family: inherit; }
 }
 .tip-item:last-child { border-bottom: none; }
 
+/* ─────────────────────────────────────────
+   WEATHER MINI CARD
+───────────────────────────────────────── */
+
+.weather-card-mini {
+  background: linear-gradient(135deg, #e8f7ef, #f4fbf7);
+  border: 1px solid var(--green-mid);
+  transition: all 0.3s ease;
+}
+
+.weather-card-mini:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.weather-mini-main {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--green-dk);
+  margin-top: 0.25rem;
+}
+
+.weather-mini-main div:last-child {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.weather-mini-extra {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  color: var(--text-sub);
+}
+
+.weather-mini-advice {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--orange);
+}
+
+
 /* Typing animation */
 .typing { color: var(--text-dim); }
 .typing::after { content: '▋'; animation: blink 1s step-end infinite; }

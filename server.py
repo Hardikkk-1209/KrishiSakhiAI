@@ -2,7 +2,11 @@
 KrishiSakhiAI — FastAPI Backend Server
 Replaces Streamlit; serves HTML/CSS/JS frontend + REST API
 """
+from dotenv import load_dotenv
+load_dotenv()
+import os
 
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 import os, sys, json, base64, requests, pickle, numpy as np, pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -12,6 +16,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+OLLAMA_URL = "http://127.0.0.1:11434"
 
 # ── Project imports ──
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -283,10 +288,52 @@ async def get_first_aid():
 @app.get("/api/reference/vet-resources")
 async def get_vet_resources():
     return {"resources": VET_RESOURCES}
+# ── Weather Forecast ──
+@app.get("/api/weather/{region}")
+async def get_weather(region: str):
+    if not WEATHER_API_KEY:
+        raise HTTPException(status_code=500, detail="Weather API key not configured")
+
+    # Map region to city name (simple mapping)
+    city = region + ",Maharashtra,IN"
+
+    try:
+        url = "https://api.openweathermap.org/data/2.5/forecast"
+        params = {
+            "q": city,
+            "appid": WEATHER_API_KEY,
+            "units": "metric"
+        }
+
+        resp = requests.get(url, params=params, timeout=10)
+
+        if resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Weather API error")
+
+        data = resp.json()
+
+        forecast_list = []
+        for item in data["list"][:5]:  # next 5 time slots
+            forecast_list.append({
+                "datetime": item["dt_txt"],
+                "temperature": item["main"]["temp"],
+                "humidity": item["main"]["humidity"],
+                "weather": item["weather"][0]["description"],
+                "wind_speed": item["wind"]["speed"]
+            })
+
+        return {
+            "region": region,
+            "forecast": forecast_list
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ── Chat (Streaming) ──
 def build_system_prompt(farmer_profile: dict = None, language: str = "English"):
     base = """You are KrishiSakhi, an advanced AI agricultural assistant with deep expertise in farming practices.
+
 
 You provide:
 ✅ Practical, actionable advice for crop management

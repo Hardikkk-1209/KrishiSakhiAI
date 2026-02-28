@@ -221,33 +221,57 @@
         </div>
 
         <!-- Right summary panel -->
-        <div class="summary-panel">
-          <div class="sp-section">
-            <div class="sp-title">Farm Overview</div>
-            <div class="sp-card">
-              <div class="sp-label">Current Season</div>
-              <div class="sp-value" id="cspSeasonVal">—</div>
-            </div>
-            <div class="sp-card">
-              <div class="sp-label">Your Region</div>
-              <div class="sp-value" id="cspRegionVal">—</div>
-            </div>
-            <div class="sp-card">
-              <div class="sp-label">AI Status</div>
-              <div class="sp-value" id="cspAiStatus" style="color:#f59e0b;">Connecting…</div>
-            </div>
-          </div>
-          <div class="sp-divider"></div>
-          <div class="sp-section">
-            <div class="sp-title">Farming Tips</div>
-            <div class="tip-item">🌧️ Check soil moisture before irrigation</div>
-            <div class="tip-item">🐛 Scout fields every 7 days for pests</div>
-            <div class="tip-item">🌡️ Monitor THI for heat stress in cattle</div>
-            <div class="tip-item">💊 Keep vaccination records updated</div>
-          </div>
-        </div>
+<div class="summary-panel">
+  <div class="sp-section">
+    <div class="sp-title">Farm Overview</div>
+
+    <div class="sp-card">
+      <div class="sp-label">Current Season</div>
+      <div class="sp-value" id="cspSeasonVal">—</div>
+    </div>
+
+    <div class="sp-card">
+      <div class="sp-label">Your Region</div>
+      <div class="sp-value" id="cspRegionVal">—</div>
+    </div>
+
+    <div class="sp-card">
+      <div class="sp-label">AI Status</div>
+      <div class="sp-value" id="cspAiStatus" style="color:#f59e0b;">Connecting…</div>
+    </div>
+
+    <!-- WEATHER CARD -->
+    <div class="sp-card weather-card-mini">
+      <div class="sp-label">🌦 Weather Advisory</div>
+
+      <div class="weather-mini-main">
+        <div id="weatherMiniTemp">--°C</div>
+        <div id="weatherMiniDesc">Loading...</div>
+      </div>
+
+      <div class="weather-mini-extra">
+        💧 <span id="weatherMiniHumidity">--%</span>
+        &nbsp; | &nbsp;
+        🌬 <span id="weatherMiniWind">-- m/s</span>
+      </div>
+
+      <div id="weatherMiniAdvice" class="weather-mini-advice">
+        Checking weather conditions...
       </div>
     </div>
+  </div>
+
+  <div class="sp-divider"></div>
+
+  <div class="sp-section">
+    <div class="sp-title">Farming Tips</div>
+    <div class="tip-item">🌧️ Check soil moisture before irrigation</div>
+    <div class="tip-item">🐛 Scout fields every 7 days for pests</div>
+    <div class="tip-item">🌡️ Monitor THI for heat stress in cattle</div>
+    <div class="tip-item">💊 Keep vaccination records updated</div>
+  </div>
+</div>
+
 
     <!-- PAGE: LIVESTOCK -->
     <div class="page" id="pageLivestock">
@@ -463,19 +487,35 @@
     syncRail(mode);
   };
   // Update AI status
-  const _ch = window.checkHealth;
-  window.checkHealth = async function() {
-    await _ch && _ch();
-    setTimeout(() => {
-      const badge = document.getElementById('ollamaStatus');
-      const ok = badge && badge.className.includes('ok');
-      const csp = document.getElementById('cspAiStatus');
-      if (csp) {
-        csp.textContent = ok ? 'Online ✓' : 'Offline';
-        csp.style.color = ok ? '#10b981' : '#ef4444';
+  // Update AI status properly
+window.checkHealth = async function() {
+  try {
+    const r = await fetch('/api/health');
+    const data = await r.json();
+
+    // Update sidebar badge
+    const badge = document.getElementById('ollamaStatus');
+    if (badge) {
+      if (data.ollama) {
+        badge.className = 'status-badge ok';
+        badge.innerHTML = '<span class="dot dot-ok"></span>Ollama Connected';
+      } else {
+        badge.className = 'status-badge err';
+        badge.innerHTML = '<span class="dot dot-err"></span>Ollama Offline';
       }
-    }, 800);
-  };
+    }
+
+    // Update summary panel
+    const csp = document.getElementById('cspAiStatus');
+    if (csp) {
+      csp.textContent = data.ollama ? 'Online ✓' : 'Offline';
+      csp.style.color = data.ollama ? '#10b981' : '#ef4444';
+    }
+
+  } catch (e) {
+    console.error("Health check error:", e);
+  }
+};
 </script>
 </body>
 </html>
