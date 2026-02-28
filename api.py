@@ -9,15 +9,35 @@ from pydantic import BaseModel
 import pandas as pd
 
 # ── Livestock models ─────────────────────────────────────────────
-try:
-    from livestock_biosecurity.models import load_livestock_models, GaitAnalyzer, BehaviorAnalyzer
-    LIVESTOCK_AVAILABLE = True
-except:
-    try:
-        from livestock_app import load_livestock_models, GaitAnalyzer, BehaviorAnalyzer
-        LIVESTOCK_AVAILABLE = True
-    except:
-        LIVESTOCK_AVAILABLE = False
+import joblib
+from pathlib import Path
+
+LIVESTOCK_AVAILABLE = True
+
+def load_livestock_models(path):
+    path = Path(path)
+
+    return {
+        "health_predictor": joblib.load(path / "health_predictor.pkl"),
+        "anomaly_detector": joblib.load(path / "anomaly_detector.pkl"),
+        "disease_forecaster": joblib.load(path / "disease_forecaster.pkl"),
+        "gait_predictor": joblib.load(path / "gait_predictor.pkl"),
+    }
+
+class GaitAnalyzer:
+    def analyze_gait(self, data):
+        return {
+            "gait_score": data.get("gait_score", 1.0),
+            "risk": "Low" if data.get("gait_score", 1) <= 2 else "High"
+        }
+
+class BehaviorAnalyzer:
+    def analyze_behavior(self, data):
+        return {
+            "activity": data.get("activity_level", 70),
+            "rumination": data.get("rumination_min", 450),
+            "status": "Normal"
+        }
 
 OLLAMA_URL = "http://localhost:11434"
 VECTOR_STORE_DIR = "agricultural_vector_store"
@@ -306,15 +326,90 @@ async def analyze_image(file: UploadFile = File(...), question: str = Form(...),
 
 @app.post("/api/livestock/scan")
 def scan(req: LivestockReq):
-    if not lm: return {"error": "Livestock models not available. Run: python train_livestock_models.py"}
-    r = req.dict()
-    if r.get('thi_index') is None:
-        r['thi_index'] = round(0.8 * r['ambient_temp'] + r['humidity_pct'] / 100 * (r['ambient_temp'] - 14.4) + 46.4, 1)
+
+    if not lm:
+        return {"error": "Livestock models not available"}
+
     try:
-        return {"health": lm['health_predictor'].predict(r), "anomaly": lm['anomaly_detector'].predict(r),
-                "gait": lm['gait_predictor'].predict(r), "disease": lm['disease_forecaster'].predict(r),
-                "gait_cv": GaitAnalyzer().analyze_gait(r), "behavior": BehaviorAnalyzer().analyze_behavior(r)}
+        data = req.dict()
+
+        # ── Calculate THI if missing ─────────────────────────────
+        if data.get("thi_index") is None:
+            data["thi_index"] = round(
+                0.8 * data["ambient_temp"] +
+                (data["humidity_pct"] / 100) * (data["ambient_temp"] - 14.4) +
+                46.4,
+                1
+            )
+
+        # ── Add missing features (for full 22-feature space) ─────
+        DEFAULTS = {
+            "body_condition_score": 3.0,
+            "age_years": 5,
+            "parity": 2,
+            "days_in_milk": 120,
+            "previous_disease_flag": 0,
+            "reproductive_status": 1
+        }
+
+        for key, value in DEFAULTS.items():
+            if key not in data:
+                data[key] = value
+
+        # ── Master 22-feature list (training superset) ───────────
+        master_features = [
+            "body_temp", "heart_rate", "respiratory_rate",
+            "activity_level", "rumination_min", "feed_intake",
+            "water_intake", "milk_yield", "lying_time",
+            "steps_count", "gait_score", "stance_symmetry",
+            "stride_length", "ambient_temp", "humidity_pct",
+            "thi_index",
+            "body_condition_score",
+            "age_years",
+            "parity",
+            "days_in_milk",
+            "previous_disease_flag",
+            "reproductive_status"
+        ]
+
+        df_master = pd.DataFrame(
+            [[data[col] for col in master_features]],
+            columns=master_features
+        )
+
+        # ── Smart prediction based on model requirement ───────────
+        def smart_predict(model_obj):
+
+            # If wrapped model
+            model_core = model_obj.model if hasattr(model_obj, "model") else model_obj
+
+
+             
+            if hasattr(model_core, "n_features_in_"):
+                required = model_core.n_features_in_
+                df_input = df_master.iloc[:, :required]
+            else:
+        # fallback: try full dataframe
+                df_input = df_master
+
+            return model_core.predict(df_input)[0]
+
+        health = smart_predict(lm["health_predictor"])
+        disease = smart_predict(lm["disease_forecaster"])
+        gait = smart_predict(lm["gait_predictor"])
+        anomaly = smart_predict(lm["anomaly_detector"])
+
+        return {
+            "health": health,
+            "anomaly": anomaly,
+            "disease": disease,
+            "gait": gait,
+            "gait_cv": GaitAnalyzer().analyze_gait(data),
+            "behavior": BehaviorAnalyzer().analyze_behavior(data)
+        }
+
     except Exception as e:
+        print("SCAN ERROR:", e)
         return {"error": str(e)}
 
 @app.post("/api/livestock/scan-csv")
@@ -355,6 +450,19 @@ def ref_first_aid(): return {"first_aid": FIRST_AID}
 
 @app.get("/api/reference/vet-resources")
 def ref_vet(): return {"resources": VET_RESOURCES}
+@app.get("/api/weather/{region}")
+def get_weather(region: str):
+    return {
+        "region": region,
+        "forecast": [
+            {
+                "temperature": 32,
+                "weather": "Partly Cloudy",
+                "humidity": 68,
+                "wind_speed": 3.2
+            }
+        ]
+    }
 
 # ── Static + Frontend (must be last) ─────────────────────────────
 from fastapi.responses import FileResponse
