@@ -20,9 +20,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadModels();
     loadRegions();
     setDefaultDates();
+
+    // If profile exists → go to main app
     if (farmerProfile) {
         completeOnboarding();
     } else {
+        // Otherwise show registration form
         showPage('pageRegister');
     }
 });
@@ -80,8 +83,17 @@ function setDefaultDates() {
 // PAGE NAVIGATION
 // ══════════════════════════════════════════
 function showPage(id) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(p => p.classList.remove('active'));
+
+    const target = document.getElementById(id);
+
+    if (!target) {
+        console.warn('Page not found:', id);
+        return;
+    }
+
+    target.classList.add('active');
 }
 
 function goStep(step) {
@@ -214,25 +226,34 @@ async function renderRareCrops() {
 // COMPLETE ONBOARDING
 // ══════════════════════════════════════════
 function completeOnboarding() {
-    document.getElementById('modeSelector').style.display = 'block';
-    document.getElementById('resetProfileBtn').style.display = 'block';
-    document.getElementById('langSelector').style.display = 'block';
-    document.getElementById('langSelect').value = selectedLang;
+    const modeSel = document.getElementById('modeSelector');
+    const resetBtn = document.getElementById('resetProfileBtn');
+    const langSel = document.getElementById('langSelector');
+
+    if (modeSel) modeSel.style.display = 'block';
+    if (resetBtn) resetBtn.style.display = 'block';
+    if (langSel) langSel.style.display = 'block';
+
+    const langDropdown = document.getElementById('langSelect');
+    if (langDropdown) langDropdown.value = selectedLang;
 
     if (farmerProfile) {
         const fSide = document.getElementById('farmerSidebar');
-        fSide.style.display = 'block';
-        fSide.innerHTML = `
-            <div class="farmer-card">
-                <div class="name">👨‍🌾 ${farmerProfile.name}</div>
-                <div class="meta">📍 ${farmerProfile.region} &nbsp;·&nbsp; ${farmerProfile.land_size} acres</div>
-            </div>`;
-        // Update summary panel
+        if (fSide) {
+            fSide.style.display = 'block';
+            fSide.innerHTML = `
+                <div class="farmer-card">
+                    <div class="name">👨‍🌾 ${farmerProfile.name}</div>
+                    <div class="meta">📍 ${farmerProfile.region} · ${farmerProfile.land_size} acres</div>
+                </div>`;
+        }
+
         const rv = document.getElementById('cspRegionVal');
         if (rv) rv.textContent = farmerProfile.region || '—';
-        if (farmerProfile && farmerProfile.region) {
-        loadWeatherMini(farmerProfile.region);
-}
+
+        if (farmerProfile.region) {
+            loadWeatherMini(farmerProfile.region);
+        }
     }
 
     const month = new Date().getMonth();
@@ -241,7 +262,6 @@ function completeOnboarding() {
     if (sv) sv.textContent = seasons[month] + ' Season';
 
     setMode('chat');
-    loadLivestockData();
 }
 
 function resetProfile() {

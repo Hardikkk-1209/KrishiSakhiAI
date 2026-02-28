@@ -83,7 +83,32 @@
 
 <!-- MAIN AREA -->
 <main class="main">
+<!-- REGISTRATION PAGE -->
+<div class="page active" id="pageRegister">
 
+  <div style="padding:2rem; max-width:600px;">
+
+    <h2>👨‍🌾 Farmer Registration</h2>
+    <p>Fill your farm details to personalize recommendations.</p>
+
+    <div style="margin-top:1rem;">
+      <input id="regName" placeholder="Full Name" class="fi" style="margin-bottom:10px;">
+      <input id="regPhone" placeholder="Phone Number" class="fi" style="margin-bottom:10px;">
+      <input id="regLand" placeholder="Land Size (acres)" class="fi" style="margin-bottom:10px;">
+      <input id="regWater" placeholder="Water Source" class="fi" style="margin-bottom:10px;">
+      <input id="regCrop" placeholder="Current Crop" class="fi" style="margin-bottom:10px;">
+      <select id="regRegion" class="fi" style="margin-bottom:10px;"></select>
+
+      <button class="btn-primary" onclick="submitRegistration()">
+        Continue
+      </button>
+
+      <div id="regError" style="color:red; margin-top:10px; display:none;"></div>
+    </div>
+
+  </div>
+
+</div>
 <!-- CHAT PAGE -->
 <div class="page" id="pageChat">
 

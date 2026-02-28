@@ -1,3 +1,4 @@
+print("🚀 RUNNING FILE:", __file__)
 import json, pickle, requests, numpy as np
 from pathlib import Path
 from typing import List, Optional
